@@ -194,14 +194,14 @@ const Index = () => {
           </section>
 
           {/* Login portals */}
-          <section className="container mx-auto px-4 py-12">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">Choose Your Portal</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-8 sm:py-12">
+            <div className="text-center mb-8 sm:mb-10">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">Choose Your Portal</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 Sign in to the appropriate portal based on your role at APS Khadki.
               </p>
             </div>
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
               {portals.map((p, i) => {
                 const Icon = p.icon;
                 return (
@@ -235,14 +235,14 @@ const Index = () => {
           </section>
 
           {/* Features */}
-          <section className="container mx-auto px-4 py-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">System Features</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-10 sm:py-16">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">System Features</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 Built to make raising and resolving issues simple, accountable, and fast.
               </p>
             </div>
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto text-center">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 max-w-6xl mx-auto text-center">
               {features.map((f, i) => {
                 const Icon = f.icon;
                 return (
@@ -267,14 +267,14 @@ const Index = () => {
           </section>
 
           {/* Meet the developers */}
-          <section className="container mx-auto px-4 py-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">Meet the Developers</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-10 sm:py-16">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">Meet the Developers</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 The team behind the APSK Issue Logging System.
               </p>
             </div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8 max-w-3xl mx-auto">
               {developers.map((d, i) => (
                 <motion.div
                   key={d.name}
