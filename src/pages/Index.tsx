@@ -96,58 +96,56 @@ const Index = () => {
   const [activeRole, setActiveRole] = useState<Role | null>(null);
 
   return (
-    <div
-      className="min-h-screen font-poppins relative"
-      style={{
-        backgroundImage: `url(${campusHero})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed",
-      }}
-    >
-      {/* Blur + dark overlay */}
-      <div className="absolute inset-0 backdrop-blur-md bg-black/50 z-0" />
+    <div className="min-h-screen font-poppins relative overflow-x-hidden">
+      {/* Fixed background — uses scroll attachment via fixed positioning, avoids iOS bg-fixed bugs */}
+      <div
+        className="fixed inset-0 -z-10 bg-center bg-cover bg-no-repeat"
+        style={{ backgroundImage: `url(${campusHero})` }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 -z-10 backdrop-blur-md bg-black/55" aria-hidden="true" />
 
       <div className="relative z-10">
         {/* Header */}
-        <header className="bg-white/10 backdrop-blur-sm border-b border-white/20">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <a href="/" className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-gold to-yellow-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-navy font-bold text-xl">A</span>
+        <header className="bg-white/10 backdrop-blur-sm border-b border-white/20 sticky top-0 z-30">
+          <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
+            <a href="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-gold to-yellow-600 rounded-lg flex items-center justify-center shadow-lg shrink-0">
+                <span className="text-navy font-bold text-lg sm:text-xl">A</span>
               </div>
-              <div>
-                <h1 className="text-gold font-bold text-xl sm:text-2xl leading-none">APS KHADKI</h1>
-                <p className="text-xs sm:text-sm text-slate-100/90">Army Public School Khadki</p>
+              <div className="min-w-0">
+                <h1 className="text-gold font-bold text-base sm:text-2xl leading-none truncate">APS KHADKI</h1>
+                <p className="text-[10px] sm:text-sm text-slate-100/90 truncate">Army Public School Khadki</p>
               </div>
             </a>
-            <div className="hidden md:flex items-center space-x-6 text-sm">
+            <div className="hidden lg:flex items-center space-x-6 text-sm shrink-0">
               <p className="font-semibold text-skyblue">Issue Logging System</p>
               <p className="text-neutral-300">Log. Track. Resolve.</p>
             </div>
+            <div className="lg:hidden text-skyblue text-xs font-semibold whitespace-nowrap">ILS</div>
           </div>
         </header>
 
         <main>
           {/* Hero */}
-          <section className="container mx-auto px-4 pt-16 pb-10">
+          <section className="container mx-auto px-4 pt-10 sm:pt-16 pb-8 sm:pb-10">
             <div className="text-center max-w-4xl mx-auto">
               <motion.div
                 initial={{ opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, type: "spring" }}
-                className="flex justify-center mb-6"
+                className="flex justify-center mb-5 sm:mb-6"
               >
-                <div className="w-20 h-20 bg-gradient-to-br from-skyblue to-blue-600 rounded-full flex items-center justify-center shadow-2xl ring-4 ring-white/10">
-                  <GraduationCap className="w-10 h-10 text-white" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-skyblue to-blue-600 rounded-full flex items-center justify-center shadow-2xl ring-4 ring-white/10">
+                  <GraduationCap className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
               </motion.div>
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="text-4xl sm:text-5xl md:text-6xl heading-on-dark mb-6 leading-tight tracking-tight"
+                className="heading-on-dark mb-5 sm:mb-6 leading-[1.05] tracking-tight"
+                style={{ fontSize: "clamp(1.875rem, 7vw, 4rem)" }}
               >
                 ARMY PUBLIC SCHOOL KHADKI
               </motion.h1>
@@ -155,7 +153,7 @@ const Index = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.25 }}
-                className="text-lg md:text-xl body-on-dark max-w-3xl mx-auto leading-relaxed"
+                className="text-base sm:text-lg md:text-xl body-on-dark max-w-3xl mx-auto leading-relaxed px-2 sm:px-0"
               >
                 A comprehensive digital Issue Logging System (ILS) for managing student complaints, teacher
                 responses, and administrative actions with real-time tracking and structured workflows.
@@ -165,7 +163,7 @@ const Index = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 backdrop-blur px-4 py-1.5 text-white/90 text-sm"
+                className="mt-6 sm:mt-8 inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 backdrop-blur px-4 py-1.5 text-white/90 text-xs sm:text-sm"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 Official APSK Platform
@@ -174,8 +172,8 @@ const Index = () => {
           </section>
 
           {/* Gallery */}
-          <section className="container mx-auto px-4 py-12">
-            <h2 className="text-3xl md:text-4xl heading-on-dark text-center mb-8">APSK GALLERY</h2>
+          <section className="container mx-auto px-4 py-8 sm:py-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark text-center mb-6 sm:mb-8">APSK GALLERY</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {galleryItems.map((g, i) => (
                 <Card
@@ -196,14 +194,14 @@ const Index = () => {
           </section>
 
           {/* Login portals */}
-          <section className="container mx-auto px-4 py-12">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">Choose Your Portal</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-8 sm:py-12">
+            <div className="text-center mb-8 sm:mb-10">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">Choose Your Portal</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 Sign in to the appropriate portal based on your role at APS Khadki.
               </p>
             </div>
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
               {portals.map((p, i) => {
                 const Icon = p.icon;
                 return (
@@ -237,14 +235,14 @@ const Index = () => {
           </section>
 
           {/* Features */}
-          <section className="container mx-auto px-4 py-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">System Features</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-10 sm:py-16">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">System Features</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 Built to make raising and resolving issues simple, accountable, and fast.
               </p>
             </div>
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto text-center">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 max-w-6xl mx-auto text-center">
               {features.map((f, i) => {
                 const Icon = f.icon;
                 return (
@@ -269,14 +267,14 @@ const Index = () => {
           </section>
 
           {/* Meet the developers */}
-          <section className="container mx-auto px-4 py-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl heading-on-dark mb-3">Meet the Developers</h2>
-              <p className="body-on-dark max-w-2xl mx-auto">
+          <section className="container mx-auto px-4 py-10 sm:py-16">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark mb-3">Meet the Developers</h2>
+              <p className="body-on-dark max-w-2xl mx-auto text-sm sm:text-base">
                 The team behind the APSK Issue Logging System.
               </p>
             </div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8 max-w-3xl mx-auto">
               {developers.map((d, i) => (
                 <motion.div
                   key={d.name}
