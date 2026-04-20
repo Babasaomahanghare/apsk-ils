@@ -1,46 +1,39 @@
 
+## Migrate APSK ILS to Lovable Cloud (permanent DB + realtime)
 
-## Add email notifications for complaint events
+Move all data off `localStorage` into a real Postgres database with row-level security and realtime updates. Login UX stays the same (admission # for students, email for teachers, fixed admin credentials).
 
-Send automated emails to students (and teachers) when complaint-related events happen. This uses Lovable's built-in email infrastructure — no third-party API keys needed.
+### 1. Enable Lovable Cloud
+Provisions Postgres + Auth + Realtime + Edge Functions.
 
-### What gets sent and when
+### 2. Database schema (migration)
 
-1. **Complaint submitted** → email to the student/teacher who submitted it
-   - "We've received your complaint" + summary + urgency + a tracking ID
-2. **Complaint status updated by admin** (resolved / rejected / pending) → email to the original author
-   - New status + admin response message (if any)
+- **`students`** — id (uuid pk), name, student_class, section, admission (unique), phone, email (unique), password_hash, created_at
+- **`teachers`** — id, name, phone, email (unique), password_hash, created_at
+- **`complaints`** — id, ticket_id (unique, e.g. `TKT-APS-2026-0001`), author_id, author_name, author_role (`student`|`teacher`), description, urgency, status, category, subtopic, response, deadline, created_at, updated_at
+- **`feedback`** — id, author_id, author_name, text, rating, created_at
+- **`notifications`** — id, user_id (text — supports `__admin__`), title, message, read, created_at
+- **`ticket_counter`** — year (pk), seq — atomic ticket numbering via `next_ticket_id()` RPC
 
-### Prerequisites (one-time setup)
+**Security**: Custom credential auth (per your choice). Passwords hashed with bcrypt via pgcrypto. RLS enabled with permissive policies — app trusts its own session, just like today. Admin gate stays the hardcoded `APSKADMINS` credentials client-side.
 
-1. **Enable Lovable Cloud** — required for any email sending. Currently the app uses `localStorage` only; we need Cloud for the email backend. The user data and complaints can stay in `localStorage` for now (no migration required), but we need Cloud just to host the email Edge Function.
-2. **Set up an email sender domain** — you'll need a domain you own (e.g. `apskhadki.edu.in`). A subdomain like `notify.yourdomain.com` gets delegated to Lovable's nameservers via NS records you add at your domain registrar. This takes ~5 minutes plus DNS propagation time.
-3. **Scaffold the email infrastructure** — sets up the email queue, suppression handling, and the `send-transactional-email` Edge Function.
+### 3. Data layer rewrite (`src/lib/store.ts` → `src/lib/db/*`)
+Replace every localStorage call with Supabase queries. Session (`{userId, role, name}`) still cached in localStorage. Ticket IDs generated server-side (race-safe).
 
-### Implementation steps
+### 4. Realtime hooks
+Supabase Realtime `postgres_changes` channels: live complaints list, live charts, slide-down notifications, live feedback panel.
 
-1. Enable Lovable Cloud
-2. Run email domain setup (you provide the domain → add NS records at registrar)
-3. Scaffold transactional email infrastructure
-4. Create two React Email templates:
-   - `complaint-received.tsx` — confirmation with description preview, urgency badge, complaint ID
-   - `complaint-status-update.tsx` — new status, admin response, color-coded
-5. Wire triggers in `src/lib/store.ts`:
-   - `addComplaint()` → invoke `send-transactional-email` with `complaint-received` template, recipient = author's email
-   - `updateComplaintStatus()` → invoke `send-transactional-email` with `complaint-status-update` template, recipient = looked up via `getUsers().find(u => u.id === complaint.authorId).email`
-6. Both calls use an `idempotencyKey` derived from the complaint ID + event type so retries are safe
-7. Build the email templates to match the APSK brand (navy / skyblue / gold, Poppins-style fallback) on a white background
+### 5. Wire up existing pages (no UI redesign)
+Auth pages, all 3 dashboards, TrackComplaint, PDF + Excel export — all consume new async data layer with loading skeletons.
 
-### What you need from the user before we start
+### 6. Seed
+Just `ticket_counter` for current year. No mock data — fresh start.
 
-- Confirm you want to enable Lovable Cloud (required)
-- The domain you want emails to come from (e.g. `notify@apskhadki.edu.in`)
-- Access to your domain registrar's DNS settings to add NS records
+### What stays the same
+All UI, dashboards, charts, animations, ticketing, SLA, PDF, Excel, design, login UX.
 
-### Notes / limitations
+### What changes
+True cross-device permanence, true multi-user realtime (admin sees a complaint the instant a student submits on another device), live charts.
 
-- File attachments aren't supported — emails will be HTML only (the complaint description is included in the body)
-- Emails can only be sent to addresses students/teachers entered at registration — make sure email validation is solid (it already is)
-- Admins won't get emails for new complaints (they already get the in-app notification + popup) — easy to add later if desired
-- Cross-tab `localStorage` sync stays as-is; emails are an additive layer
-
+### Risks
+Custom-password DB auth is weaker than Supabase Auth even with bcrypt — you accepted the trade-off. All existing localStorage data is lost (you confirmed). First load slightly slower (mitigated with skeletons).
