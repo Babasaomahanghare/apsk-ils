@@ -30,15 +30,17 @@ export type AppUser = StudentUser | TeacherUser;
 
 export interface Complaint {
   id: string;
+  ticketId: string;        // TKT-APS-YYYY-NNNN
   authorId: string;
   authorName: string;
   authorRole: "student" | "teacher";
   description: string;
   urgency: Urgency;
   status: Status;
-  category?: string;   // teacher only
-  subtopic?: string;   // teacher only
-  response?: string;   // admin response
+  category?: string;
+  subtopic?: string;
+  response?: string;
+  deadline: number;        // SLA timestamp
   createdAt: number;
   updatedAt: number;
 }
@@ -48,13 +50,13 @@ export interface Feedback {
   authorId: string;
   authorName: string;
   text: string;
-  rating: number; // 1..5
+  rating: number;
   createdAt: number;
 }
 
 export interface Notification {
   id: string;
-  userId: string; // recipient
+  userId: string;
   title: string;
   message: string;
   read: boolean;
@@ -73,6 +75,7 @@ const KEYS = {
   feedback: "apsk.feedback",
   notifications: "apsk.notifications",
   session: "apsk.session",
+  ticketSeq: "apsk.ticketSeq", // { year: number, seq: number }
 } as const;
 
 export const TEACHER_CATEGORIES = {
@@ -104,12 +107,41 @@ const read = <T>(key: string, fallback: T): T => {
 
 const write = (key: string, value: unknown) => {
   localStorage.setItem(key, JSON.stringify(value));
-  // Same-tab listeners (storage event only fires on OTHER tabs)
   window.dispatchEvent(new CustomEvent("apsk:store", { detail: { key } }));
 };
 
 const uid = () =>
   (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+
+// ---------- SLA ----------
+const SLA_HOURS: Record<Urgency, number> = {
+  low: 5 * 24,    // 5 days
+  medium: 3 * 24, // 3 days
+  high: 24,       // 24 hours
+};
+
+export const slaDeadlineFrom = (createdAt: number, urgency: Urgency): number =>
+  createdAt + SLA_HOURS[urgency] * 3600 * 1000;
+
+export type SlaState = "ontime" | "near" | "overdue" | "done";
+
+export const slaState = (c: Complaint, now = Date.now()): SlaState => {
+  if (c.status === "resolved" || c.status === "rejected") return "done";
+  const remaining = c.deadline - now;
+  if (remaining <= 0) return "overdue";
+  const totalMs = SLA_HOURS[c.urgency] * 3600 * 1000;
+  if (remaining <= totalMs * 0.25) return "near";
+  return "ontime";
+};
+
+// ---------- ticket id ----------
+const nextTicketId = (createdAt: number): string => {
+  const year = new Date(createdAt).getFullYear();
+  const cur = read<{ year: number; seq: number }>(KEYS.ticketSeq, { year, seq: 0 });
+  const next = cur.year === year ? { year, seq: cur.seq + 1 } : { year, seq: 1 };
+  write(KEYS.ticketSeq, next);
+  return `TKT-APS-${year}-${String(next.seq).padStart(4, "0")}`;
+};
 
 // ---------- accessors ----------
 export const getUsers = (): AppUser[] => read<AppUser[]>(KEYS.users, []);
@@ -117,6 +149,9 @@ export const getComplaints = (): Complaint[] => read<Complaint[]>(KEYS.complaint
 export const getFeedback = (): Feedback[] => read<Feedback[]>(KEYS.feedback, []);
 export const getNotifications = (): Notification[] => read<Notification[]>(KEYS.notifications, []);
 export const getSession = (): Session | null => read<Session | null>(KEYS.session, null);
+
+export const findComplaintByTicket = (ticketId: string): Complaint | undefined =>
+  getComplaints().find((c) => c.ticketId.toLowerCase() === ticketId.trim().toLowerCase());
 
 // ---------- mutations ----------
 export const registerStudent = (
@@ -183,21 +218,23 @@ export const setSession = (s: Session | null) => {
 export const logout = () => setSession(null);
 
 export const addComplaint = (
-  c: Omit<Complaint, "id" | "createdAt" | "updatedAt" | "status">,
+  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline">,
 ): Complaint => {
+  const createdAt = Date.now();
   const complaint: Complaint = {
     ...c,
     id: uid(),
+    ticketId: nextTicketId(createdAt),
     status: "pending",
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    deadline: slaDeadlineFrom(createdAt, c.urgency),
+    createdAt,
+    updatedAt: createdAt,
   };
   write(KEYS.complaints, [complaint, ...getComplaints()]);
-  // Notify admin
   pushNotification({
     userId: ADMIN_USER_ID,
     title: c.urgency === "high" ? "🚨 URGENT complaint received" : "New complaint received",
-    message: `${c.authorName} (${c.authorRole}) submitted a complaint.`,
+    message: `${complaint.ticketId} — ${c.authorName} (${c.authorRole})`,
   });
   return complaint;
 };
@@ -218,13 +255,10 @@ export const updateComplaintStatus = (
   };
   list[idx] = updated;
   write(KEYS.complaints, list);
-  // Notify the author
   pushNotification({
     userId: updated.authorId,
-    title: `Complaint ${status}`,
-    message: response
-      ? `Admin: ${response}`
-      : `Your complaint status was updated to "${status}".`,
+    title: `${updated.ticketId} ${status}`,
+    message: response ? `Admin: ${response}` : `Status updated to "${status}".`,
   });
 };
 
