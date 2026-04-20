@@ -172,28 +172,7 @@ const Index = () => {
             </div>
           </section>
 
-          {/* Gallery */}
-          <section className="container mx-auto px-4 py-8 sm:py-12">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl heading-on-dark text-center mb-6 sm:mb-8">APSK GALLERY</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {galleryItems.map((g, i) => (
-                <Card
-                  key={g.title}
-                  className="glass-card animate-fade-in overflow-hidden border-0"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                >
-                  <div className="aspect-square bg-gradient-to-br from-skyblue/30 via-navy/20 to-gold/30 flex items-center justify-center">
-                    <ImageIcon className="w-10 h-10 text-navy/40" />
-                  </div>
-                  <CardContent className="p-3 text-center">
-                    <p className="font-semibold text-navy text-sm">{g.title}</p>
-                    <p className="text-xs text-gray-500">{g.caption}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-
+          {/* Gallery removed */}
           {/* Login portals */}
           <section className="container mx-auto px-4 py-8 sm:py-12">
             <div className="text-center mb-8 sm:mb-10">
