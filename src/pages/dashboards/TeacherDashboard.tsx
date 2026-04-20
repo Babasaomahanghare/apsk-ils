@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, ClipboardList, MessageSquare } from "lucide-react";
+import { Send, ClipboardList, MessageSquare, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { useComplaints } from "@/hooks/useStore";
 import {
@@ -23,6 +24,7 @@ import {
   type Session,
   type Urgency,
 } from "@/lib/store";
+import { generateTicketPdf } from "@/lib/ticketPdf";
 
 interface Props { session: Session }
 
@@ -58,14 +60,14 @@ export const TeacherDashboard = ({ session }: Props) => {
   const [urgency, setUrgency] = useState<Urgency>("low");
   const descWords = wordCount(desc);
 
-  const submit = () => {
+  const submit = async () => {
     if (!category) return toast.error("Select a category.");
     if (!subtopic) return toast.error("Select a subtopic.");
     if (descWords < 30)
       return toast.error("Description too short", {
         description: `Need at least 30 words (currently ${descWords}).`,
       });
-    addComplaint({
+    const complaint = addComplaint({
       authorId: session.userId,
       authorName: session.name,
       authorRole: "teacher",
@@ -78,7 +80,14 @@ export const TeacherDashboard = ({ session }: Props) => {
     setSubtopic("");
     setDesc("");
     setUrgency("low");
-    toast.success("✅ Issue submitted to Admin");
+    toast.success(`✅ Submitted — ${complaint.ticketId}`, {
+      description: "Your PDF receipt is downloading...",
+    });
+    try {
+      await generateTicketPdf(complaint);
+    } catch {
+      toast.error("PDF download failed");
+    }
   };
 
   return (
@@ -217,8 +226,10 @@ export const TeacherDashboard = ({ session }: Props) => {
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <TicketIdChip ticketId={c.ticketId} />
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
+                    <SlaBadge complaint={c} />
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}
@@ -235,6 +246,16 @@ export const TeacherDashboard = ({ session }: Props) => {
                       <span className="text-blue-900"><strong>Admin:</strong> {c.response}</span>
                     </div>
                   )}
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => generateTicketPdf(c)}
+                    >
+                      <Download className="w-3 h-3 mr-1" /> PDF
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>
