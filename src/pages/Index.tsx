@@ -19,8 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Disclaimer } from "@/components/Disclaimer";
 import { LoginDialog, type Role } from "@/components/LoginDialog";
 import campusHero from "@/assets/campus-hero.jpg";
-import devSoham from "@/assets/dev-soham.jpg";
-import devAtharv from "@/assets/dev-atharv.jpg";
+import verifiedBadge from "@/assets/verified-badge.png";
 
 const portals = [
   {
@@ -73,15 +72,17 @@ const features = [
 const developers = [
   {
     name: "Soham Mahangare",
+    initials: "SM",
     role: "🚀 Lead Developer",
     description: "Architect and lead developer of the APSK Issue Logging System.",
-    image: devSoham,
+    gradient: "from-skyblue to-blue-600",
   },
   {
     name: "Atharv Mishra",
+    initials: "AM",
     role: "🔧 Co-Developer",
     description: "Co-developer focused on UI, features and quality of the ILS platform.",
-    image: devAtharv,
+    gradient: "from-emerald-500 to-emerald-700",
   },
 ];
 
@@ -286,20 +287,22 @@ const Index = () => {
                   <Card className="glass-card border-0 overflow-hidden">
                     <CardContent className="p-6 text-center">
                       <div className="relative w-24 h-24 mx-auto mb-4">
-                        <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-skyblue to-blue-600 blur-md opacity-60" />
+                        <div className={`absolute -inset-1 rounded-full bg-gradient-to-br ${d.gradient} blur-md opacity-60`} />
+                        <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${d.gradient} ring-4 ring-white shadow-lg flex items-center justify-center`}>
+                          <span className="text-white font-bold text-2xl tracking-wide">{d.initials}</span>
+                        </div>
                         <img
-                          src={d.image}
-                          alt={d.name}
-                          width={512}
-                          height={512}
-                          loading="lazy"
-                          className="relative w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg"
+                          src={verifiedBadge}
+                          alt="Verified"
+                          width={28}
+                          height={28}
+                          className="absolute -bottom-1 -right-1 w-7 h-7 drop-shadow-md"
                         />
-                        <span className="absolute -bottom-1 -right-1 bg-skyblue rounded-full p-1 ring-2 ring-white">
-                          <BadgeCheck className="w-4 h-4 text-white" aria-label="Verified" />
-                        </span>
                       </div>
-                      <h3 className="text-xl font-bold text-navy">{d.name}</h3>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <h3 className="text-xl font-bold text-navy">{d.name}</h3>
+                        <img src={verifiedBadge} alt="Verified" width={18} height={18} className="w-[18px] h-[18px]" />
+                      </div>
                       <p className="text-skyblue font-semibold text-sm mt-1">{d.role}</p>
                       <p className="text-gray-600 text-sm mt-3 leading-relaxed">{d.description}</p>
                       <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
