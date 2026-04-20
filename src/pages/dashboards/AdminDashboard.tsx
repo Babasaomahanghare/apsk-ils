@@ -177,10 +177,12 @@ export const AdminDashboard = ({ session }: Props) => {
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <TicketIdChip ticketId={c.ticketId} />
                     <span className="font-semibold text-sm text-navy">{c.authorName}</span>
                     <RoleTag role={c.authorRole} />
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
+                    <SlaBadge complaint={c} />
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}
