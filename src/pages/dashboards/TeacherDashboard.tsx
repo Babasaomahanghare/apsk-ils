@@ -1,0 +1,246 @@
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Send, ClipboardList, MessageSquare } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
+import { useComplaints } from "@/hooks/useStore";
+import {
+  addComplaint,
+  TEACHER_CATEGORIES,
+  wordCount,
+  type Session,
+  type Urgency,
+} from "@/lib/store";
+
+interface Props { session: Session }
+
+type Category = keyof typeof TEACHER_CATEGORIES;
+
+export const TeacherDashboard = ({ session }: Props) => {
+  const all = useComplaints();
+  const mine = useMemo(
+    () => all.filter((c) => c.authorId === session.userId),
+    [all, session.userId],
+  );
+
+  const stats = useMemo(() => {
+    const total = mine.length;
+    const resolved = mine.filter((c) => c.status === "resolved").length;
+    const pending = mine.filter((c) => c.status === "pending").length;
+    const rejected = mine.filter((c) => c.status === "rejected").length;
+    return { total, resolved, pending, rejected };
+  }, [mine]);
+
+  const categoryCounts = useMemo(() => {
+    const labels = Object.keys(TEACHER_CATEGORIES);
+    const values = labels.map(
+      (cat) => mine.filter((c) => c.category === cat).length,
+    );
+    return { labels, values };
+  }, [mine]);
+
+  // Form
+  const [category, setCategory] = useState<Category | "">("");
+  const [subtopic, setSubtopic] = useState("");
+  const [desc, setDesc] = useState("");
+  const [urgency, setUrgency] = useState<Urgency>("low");
+  const descWords = wordCount(desc);
+
+  const submit = () => {
+    if (!category) return toast.error("Select a category.");
+    if (!subtopic) return toast.error("Select a subtopic.");
+    if (descWords < 30)
+      return toast.error("Description too short", {
+        description: `Need at least 30 words (currently ${descWords}).`,
+      });
+    addComplaint({
+      authorId: session.userId,
+      authorName: session.name,
+      authorRole: "teacher",
+      description: desc.trim(),
+      urgency,
+      category,
+      subtopic,
+    });
+    setCategory("");
+    setSubtopic("");
+    setDesc("");
+    setUrgency("low");
+    toast.success("✅ Issue submitted to Admin");
+  };
+
+  return (
+    <DashboardShell session={session} gradient="from-emerald-500 to-emerald-700" roleLabel="Teacher">
+      {/* Analytics */}
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
+        <Card className="glass-card border-0">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-navy">My Issues — Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PieChartCard
+              data={[
+                { label: `Total (${stats.total})`, value: stats.total, color: "#3b82f6" },
+                { label: `Resolved (${stats.resolved})`, value: stats.resolved, color: "#10b981" },
+                { label: `Pending (${stats.pending})`, value: stats.pending, color: "#f59e0b" },
+                { label: `Rejected (${stats.rejected})`, value: stats.rejected, color: "#ef4444" },
+              ]}
+            />
+          </CardContent>
+        </Card>
+        <Card className="glass-card border-0">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-navy">Issues by Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChartCard labels={categoryCounts.labels} values={categoryCounts.values} color="#10b981" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Create issue */}
+      <Card className="glass-card border-0">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-navy flex items-center gap-2">
+            <Send className="w-4 h-4 text-emerald-600" /> Create Structured Issue
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-semibold text-navy">Category</Label>
+              <Select
+                value={category}
+                onValueChange={(v) => {
+                  setCategory(v as Category);
+                  setSubtopic("");
+                }}
+              >
+                <SelectTrigger className="mt-1 h-11"><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {Object.keys(TEACHER_CATEGORIES).map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-navy">Subtopic</Label>
+              <Select value={subtopic} onValueChange={setSubtopic} disabled={!category}>
+                <SelectTrigger className="mt-1 h-11"><SelectValue placeholder={category ? "Select subtopic" : "Select category first"} /></SelectTrigger>
+                <SelectContent>
+                  {category &&
+                    TEACHER_CATEGORIES[category as Category].map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-navy">Description (min 30 words)</Label>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              rows={4}
+              placeholder="Provide details about the issue..."
+              className="mt-1"
+            />
+            <p className={`text-xs mt-1 ${descWords >= 30 ? "text-emerald-600" : "text-gray-500"}`}>
+              {descWords} / 30 words
+            </p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-navy">Urgency</Label>
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              {(["low", "medium", "high"] as Urgency[]).map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => setUrgency(u)}
+                  className={`text-xs font-bold py-2 rounded-md border transition-all uppercase tracking-wide ${
+                    urgency === u
+                      ? u === "high"
+                        ? "bg-red-500 text-white border-red-600"
+                        : u === "medium"
+                          ? "bg-amber-500 text-white border-amber-600"
+                          : "bg-slate-700 text-white border-slate-800"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {u === "high" ? "High (URGENT)" : u}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={submit}
+            className="w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white font-semibold"
+          >
+            Submit Issue
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Status tracking */}
+      <Card className="glass-card border-0">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-navy flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-emerald-600" /> Status Tracking
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {mine.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-6">No issues submitted yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {mine.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className={`rounded-lg border p-3 ${
+                    c.urgency === "high" ? "border-red-300 bg-red-50/40" : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <UrgencyBadge urgency={c.urgency} />
+                    <StatusBadge status={c.status} />
+                    {c.category && (
+                      <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
+                        {c.category} → {c.subtopic}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-400 ml-auto">
+                      {new Date(c.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.description}</p>
+                  {c.response && (
+                    <div className="mt-2 flex items-start gap-2 text-xs bg-blue-50 border border-blue-200 rounded-md p-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
+                      <span className="text-blue-900"><strong>Admin:</strong> {c.response}</span>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </DashboardShell>
+  );
+};

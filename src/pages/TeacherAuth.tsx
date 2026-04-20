@@ -13,6 +13,7 @@ import {
   validatePassword,
   type FieldErrors,
 } from "@/lib/validation";
+import { loginTeacher, registerTeacher } from "@/lib/store";
 
 const TeacherAuth = () => {
   const navigate = useNavigate();
@@ -59,8 +60,21 @@ const TeacherAuth = () => {
   };
 
   const handleRegister = () => {
-    toast.success("Registration complete");
-    navigate("/dashboard/teacher");
+    const res = registerTeacher({
+      name: form.name.trim().replace(/\s+/g, " "),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      password: form.password,
+    });
+    if (!res.ok) {
+      toast.error("Registration failed", { description: res.error });
+      return;
+    }
+    const login = loginTeacher(form.email.trim(), form.password);
+    if (login.ok) {
+      toast.success("Registration complete");
+      navigate("/dashboard/teacher");
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -71,7 +85,11 @@ const TeacherAuth = () => {
       toast.error(emailErr || pwdErr || "Invalid credentials");
       return;
     }
-    toast.success("Signed in");
+    const res = loginTeacher(loginEmail.trim(), loginPwd);
+    if (!res.ok) {
+      toast.error("Sign-in failed", { description: res.error });
+      return;
+    }
     navigate("/dashboard/teacher");
   };
 
