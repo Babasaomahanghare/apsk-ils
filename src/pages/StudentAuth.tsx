@@ -15,6 +15,7 @@ import {
   validateRequired,
   type FieldErrors,
 } from "@/lib/validation";
+import { loginStudent, registerStudent } from "@/lib/store";
 
 const StudentAuth = () => {
   const navigate = useNavigate();
@@ -81,8 +82,24 @@ const StudentAuth = () => {
   };
 
   const handleRegister = () => {
-    toast.success("Registration complete", { description: "Welcome to APSK ILS." });
-    navigate("/dashboard/student");
+    const res = registerStudent({
+      name: form.name.trim().replace(/\s+/g, " "),
+      studentClass: form.studentClass.trim(),
+      section: form.section.trim().toUpperCase(),
+      admission: form.admission.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      password: form.password,
+    });
+    if (!res.ok) {
+      toast.error("Registration failed", { description: res.error });
+      return;
+    }
+    const login = loginStudent(form.admission.trim(), form.password);
+    if (login.ok) {
+      toast.success("Registration complete", { description: "Welcome to APSK ILS." });
+      navigate("/dashboard/student");
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -93,7 +110,11 @@ const StudentAuth = () => {
       toast.error(admErr || pwdErr || "Invalid credentials");
       return;
     }
-    toast.success("Signed in", { description: "Redirecting to dashboard..." });
+    const res = loginStudent(loginAdm.trim(), loginPwd);
+    if (!res.ok) {
+      toast.error("Sign-in failed", { description: res.error });
+      return;
+    }
     navigate("/dashboard/student");
   };
 

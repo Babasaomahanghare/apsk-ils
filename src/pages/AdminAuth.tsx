@@ -5,9 +5,7 @@ import { toast } from "sonner";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { FormField } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
-
-const ADMIN_USER = "APSKADMINS";
-const ADMIN_PASS = "APSKADMINS19065";
+import { loginAdmin } from "@/lib/store";
 
 const AdminAuth = () => {
   const navigate = useNavigate();
@@ -18,12 +16,12 @@ const AdminAuth = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
-      toast.success("Welcome, Administrator");
+    const res = loginAdmin(username, password);
+    if (res.ok) {
       navigate("/dashboard/admin");
     } else {
-      setError("Invalid admin credentials.");
-      toast.error("Access denied", { description: "Invalid admin credentials." });
+      setError(res.error || "Invalid admin credentials.");
+      toast.error("Access denied", { description: res.error });
     }
   };
 
