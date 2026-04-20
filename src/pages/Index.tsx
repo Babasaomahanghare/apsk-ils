@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
   GraduationCap,
   Users,
@@ -17,7 +17,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Disclaimer } from "@/components/Disclaimer";
-import { LoginDialog, type Role } from "@/components/LoginDialog";
+
+type Role = "student" | "teacher" | "admin";
 import campusHero from "@/assets/campus-hero.jpg";
 import verifiedBadge from "@/assets/verified-badge.png";
 
@@ -94,8 +95,6 @@ const galleryItems = [
 ];
 
 const Index = () => {
-  const [activeRole, setActiveRole] = useState<Role | null>(null);
-
   return (
     <div className="min-h-screen font-poppins relative overflow-x-hidden">
       {/* Fixed background — uses scroll attachment via fixed positioning, avoids iOS bg-fixed bugs */}
@@ -200,13 +199,14 @@ const Index = () => {
                       <CardDescription className="text-gray-600">{p.description}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <Button
-                        onClick={() => setActiveRole(p.role)}
-                        className={`w-full h-11 bg-gradient-to-r ${p.gradient} hover:opacity-95 text-white font-semibold`}
-                      >
-                        <LogIn className="w-4 h-4 mr-2" />
-                        {p.button}
-                      </Button>
+                      <Link to={`/auth/${p.role}`}>
+                        <Button
+                          className={`w-full h-11 bg-gradient-to-r ${p.gradient} hover:opacity-95 text-white font-semibold`}
+                        >
+                          <LogIn className="w-4 h-4 mr-2" />
+                          {p.button}
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 );
@@ -340,7 +340,6 @@ const Index = () => {
       </div>
 
       <Disclaimer />
-      <LoginDialog role={activeRole} onClose={() => setActiveRole(null)} />
     </div>
   );
 };
