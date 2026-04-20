@@ -122,7 +122,15 @@ const Index = () => {
               <p className="font-semibold text-skyblue">Issue Logging System</p>
               <p className="text-neutral-300">Log. Track. Resolve.</p>
             </div>
-            <div className="lg:hidden text-skyblue text-xs font-semibold whitespace-nowrap">ILS</div>
+            <div className="hidden sm:flex items-center gap-3 shrink-0">
+              <Link
+                to="/track"
+                className="text-xs sm:text-sm font-semibold text-white bg-white/15 hover:bg-white/25 border border-white/25 backdrop-blur px-3 py-1.5 rounded-full transition"
+              >
+                🎟️ Track Complaint
+              </Link>
+            </div>
+            <div className="lg:hidden text-skyblue text-xs font-semibold whitespace-nowrap sm:hidden">ILS</div>
           </div>
         </header>
 

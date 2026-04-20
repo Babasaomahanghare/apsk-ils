@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Star, MessageSquare, ClipboardList } from "lucide-react";
+import { Send, Star, MessageSquare, ClipboardList, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, LineChartCard, buildLast7Days } from "@/components/dashboard/Charts";
 import { useComplaints } from "@/hooks/useStore";
 import { addComplaint, addFeedback, wordCount, type Session, type Urgency } from "@/lib/store";
+import { generateTicketPdf } from "@/lib/ticketPdf";
 
 interface Props { session: Session }
 
@@ -34,12 +36,12 @@ export const StudentDashboard = ({ session }: Props) => {
   const [urgency, setUrgency] = useState<Urgency>("low");
   const descWords = wordCount(desc);
 
-  const submitComplaint = () => {
+  const submitComplaint = async () => {
     if (descWords < 50) {
       toast.error("Description too short", { description: `Need at least 50 words (currently ${descWords}).` });
       return;
     }
-    addComplaint({
+    const complaint = addComplaint({
       authorId: session.userId,
       authorName: session.name,
       authorRole: "student",
@@ -48,7 +50,14 @@ export const StudentDashboard = ({ session }: Props) => {
     });
     setDesc("");
     setUrgency("low");
-    toast.success("✅ Complaint submitted successfully");
+    toast.success(`✅ Submitted — ${complaint.ticketId}`, {
+      description: "Your PDF receipt is downloading...",
+    });
+    try {
+      await generateTicketPdf(complaint);
+    } catch {
+      toast.error("PDF download failed");
+    }
   };
 
   // Feedback
@@ -224,8 +233,10 @@ export const StudentDashboard = ({ session }: Props) => {
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <TicketIdChip ticketId={c.ticketId} />
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
+                    <SlaBadge complaint={c} />
                     <span className="text-[10px] text-gray-400 ml-auto">
                       {new Date(c.createdAt).toLocaleString()}
                     </span>
@@ -237,6 +248,16 @@ export const StudentDashboard = ({ session }: Props) => {
                       <span className="text-blue-900"><strong>Admin:</strong> {c.response}</span>
                     </div>
                   )}
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => generateTicketPdf(c)}
+                    >
+                      <Download className="w-3 h-3 mr-1" /> PDF
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>

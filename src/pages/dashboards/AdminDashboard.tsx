@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DashboardShell, RoleTag, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { useComplaints, useUsers } from "@/hooks/useStore";
 import { updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { exportComplaintsXlsx } from "@/lib/excelExport";
 
 interface Props { session: Session }
 
 export const AdminDashboard = ({ session }: Props) => {
-  const complaints = useComplaints();
+  const complaintsRaw = useComplaints();
   const users = useUsers();
+
+  // Sort: pending+urgent first, then by createdAt desc
+  const complaints = useMemo(() => {
+    const score = (c: typeof complaintsRaw[number]) => {
+      let s = 0;
+      if (c.status === "pending" && c.urgency === "high") s += 1000;
+      else if (c.status === "pending") s += 100;
+      if (c.urgency === "high") s += 50;
+      else if (c.urgency === "medium") s += 20;
+      return s;
+    };
+    return [...complaintsRaw].sort((a, b) => score(b) - score(a) || b.createdAt - a.createdAt);
+  }, [complaintsRaw]);
 
   const stats = useMemo(() => {
     const total = complaints.length;
@@ -124,9 +139,25 @@ export const AdminDashboard = ({ session }: Props) => {
       {/* All complaints */}
       <Card className="glass-card border-0">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base text-navy flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-indigo-600" /> All Complaints ({complaints.length})
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="text-base text-navy flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-indigo-600" /> All Complaints ({complaints.length})
+            </CardTitle>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (complaints.length === 0) {
+                  toast.error("No complaints to export.");
+                  return;
+                }
+                exportComplaintsXlsx(complaints, users);
+                toast.success("📊 Excel export downloaded");
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {complaints.length === 0 ? (
@@ -146,10 +177,12 @@ export const AdminDashboard = ({ session }: Props) => {
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <TicketIdChip ticketId={c.ticketId} />
                     <span className="font-semibold text-sm text-navy">{c.authorName}</span>
                     <RoleTag role={c.authorRole} />
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
+                    <SlaBadge complaint={c} />
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}

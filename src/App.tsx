@@ -9,6 +9,7 @@ import StudentAuth from "./pages/StudentAuth.tsx";
 import TeacherAuth from "./pages/TeacherAuth.tsx";
 import AdminAuth from "./pages/AdminAuth.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
+import TrackComplaint from "./pages/TrackComplaint.tsx";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/auth/teacher" element={<TeacherAuth />} />
           <Route path="/auth/admin" element={<AdminAuth />} />
           <Route path="/dashboard/:role" element={<Dashboard />} />
+          <Route path="/track" element={<TrackComplaint />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
