@@ -81,8 +81,8 @@ const StudentAuth = () => {
     }, 900);
   };
 
-  const handleRegister = () => {
-    const res = registerStudent({
+  const handleRegister = async () => {
+    const res = await registerStudent({
       name: form.name.trim().replace(/\s+/g, " "),
       studentClass: form.studentClass.trim(),
       section: form.section.trim().toUpperCase(),
@@ -95,14 +95,14 @@ const StudentAuth = () => {
       toast.error("Registration failed", { description: res.error });
       return;
     }
-    const login = loginStudent(form.admission.trim(), form.password);
+    const login = await loginStudent(form.admission.trim(), form.password);
     if (login.ok) {
       toast.success("Registration complete", { description: "Welcome to APSK ILS." });
       navigate("/dashboard/student");
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const admErr = validateAdmission(loginAdm);
     const pwdErr = validatePassword(loginPwd);
@@ -110,7 +110,7 @@ const StudentAuth = () => {
       toast.error(admErr || pwdErr || "Invalid credentials");
       return;
     }
-    const res = loginStudent(loginAdm.trim(), loginPwd);
+    const res = await loginStudent(loginAdm.trim(), loginPwd);
     if (!res.ok) {
       toast.error("Sign-in failed", { description: res.error });
       return;

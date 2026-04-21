@@ -59,8 +59,8 @@ const TeacherAuth = () => {
     }, 900);
   };
 
-  const handleRegister = () => {
-    const res = registerTeacher({
+  const handleRegister = async () => {
+    const res = await registerTeacher({
       name: form.name.trim().replace(/\s+/g, " "),
       phone: form.phone.trim(),
       email: form.email.trim(),
@@ -70,14 +70,14 @@ const TeacherAuth = () => {
       toast.error("Registration failed", { description: res.error });
       return;
     }
-    const login = loginTeacher(form.email.trim(), form.password);
+    const login = await loginTeacher(form.email.trim(), form.password);
     if (login.ok) {
       toast.success("Registration complete");
       navigate("/dashboard/teacher");
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailErr = validateEmail(loginEmail);
     const pwdErr = validatePassword(loginPwd);
@@ -85,7 +85,7 @@ const TeacherAuth = () => {
       toast.error(emailErr || pwdErr || "Invalid credentials");
       return;
     }
-    const res = loginTeacher(loginEmail.trim(), loginPwd);
+    const res = await loginTeacher(loginEmail.trim(), loginPwd);
     if (!res.ok) {
       toast.error("Sign-in failed", { description: res.error });
       return;

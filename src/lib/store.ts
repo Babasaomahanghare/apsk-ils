@@ -326,8 +326,8 @@ export const addComplaint = async (
 export const updateComplaintStatus = async (
   id: string, status: Status, response?: string,
 ) => {
-  const patch: Record<string, unknown> = { status };
-  if (response !== undefined) patch.response = response;
+  const patch: { status: Status; response?: string } =
+    response !== undefined ? { status, response } : { status };
   const { data, error } = await supabase.from("complaints")
     .update(patch).eq("id", id).select("*").single();
   if (error || !data) { console.error(error); return; }
