@@ -1,5 +1,7 @@
-// Shared localStorage-backed store with cross-tab sync via 'storage' event.
-// All data is REAL — written by users via the app. No seeded mock data.
+// Supabase-backed data layer. The session ({userId, role, name}) is still cached
+// in localStorage so refreshes keep the user logged in. All other data is in Postgres.
+
+import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "student" | "teacher" | "admin";
 export type Urgency = "low" | "medium" | "high";
@@ -14,7 +16,6 @@ export interface StudentUser {
   admission: string;
   phone: string;
   email: string;
-  password: string;
   createdAt: number;
 }
 export interface TeacherUser {
@@ -23,7 +24,6 @@ export interface TeacherUser {
   name: string;
   phone: string;
   email: string;
-  password: string;
   createdAt: number;
 }
 export type AppUser = StudentUser | TeacherUser;
@@ -69,14 +69,7 @@ export interface Session {
   name: string;
 }
 
-const KEYS = {
-  users: "apsk.users",
-  complaints: "apsk.complaints",
-  feedback: "apsk.feedback",
-  notifications: "apsk.notifications",
-  session: "apsk.session",
-  ticketSeq: "apsk.ticketSeq", // { year: number, seq: number }
-} as const;
+const SESSION_KEY = "apsk.session";
 
 export const TEACHER_CATEGORIES = {
   "School Infrastructure": ["Bench", "Projector", "Interactive Panel", "Windows", "Fan"],
@@ -94,24 +87,6 @@ export const TEACHER_CATEGORIES = {
 export const ADMIN_USERNAME = "APSKADMINS";
 export const ADMIN_PASSWORD = "APSKADMINS19065";
 export const ADMIN_USER_ID = "__admin__";
-
-// ---------- low-level helpers ----------
-const read = <T>(key: string, fallback: T): T => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const write = (key: string, value: unknown) => {
-  localStorage.setItem(key, JSON.stringify(value));
-  window.dispatchEvent(new CustomEvent("apsk:store", { detail: { key } }));
-};
-
-const uid = () =>
-  (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
 // ---------- SLA ----------
 const SLA_HOURS: Record<Urgency, number> = {
@@ -134,104 +109,213 @@ export const slaState = (c: Complaint, now = Date.now()): SlaState => {
   return "ontime";
 };
 
-// ---------- ticket id ----------
-const nextTicketId = (createdAt: number): string => {
-  const year = new Date(createdAt).getFullYear();
-  const cur = read<{ year: number; seq: number }>(KEYS.ticketSeq, { year, seq: 0 });
-  const next = cur.year === year ? { year, seq: cur.seq + 1 } : { year, seq: 1 };
-  write(KEYS.ticketSeq, next);
-  return `TKT-APS-${year}-${String(next.seq).padStart(4, "0")}`;
+// ---------- row mappers ----------
+type ComplaintRow = {
+  id: string; ticket_id: string; author_id: string; author_name: string;
+  author_role: "student" | "teacher"; description: string; urgency: Urgency;
+  status: Status; category: string | null; subtopic: string | null;
+  response: string | null; deadline: string; created_at: string; updated_at: string;
+};
+type StudentRow = {
+  id: string; name: string; student_class: string; section: string;
+  admission: string; phone: string; email: string; created_at: string;
+};
+type TeacherRow = {
+  id: string; name: string; phone: string; email: string; created_at: string;
+};
+type FeedbackRow = {
+  id: string; author_id: string; author_name: string; text: string;
+  rating: number; created_at: string;
+};
+type NotificationRow = {
+  id: string; user_id: string; title: string; message: string;
+  read: boolean; created_at: string;
 };
 
-// ---------- accessors ----------
-export const getUsers = (): AppUser[] => read<AppUser[]>(KEYS.users, []);
-export const getComplaints = (): Complaint[] => read<Complaint[]>(KEYS.complaints, []);
-export const getFeedback = (): Feedback[] => read<Feedback[]>(KEYS.feedback, []);
-export const getNotifications = (): Notification[] => read<Notification[]>(KEYS.notifications, []);
-export const getSession = (): Session | null => read<Session | null>(KEYS.session, null);
+export const mapComplaint = (r: ComplaintRow): Complaint => ({
+  id: r.id,
+  ticketId: r.ticket_id,
+  authorId: r.author_id,
+  authorName: r.author_name,
+  authorRole: r.author_role,
+  description: r.description,
+  urgency: r.urgency,
+  status: r.status,
+  category: r.category ?? undefined,
+  subtopic: r.subtopic ?? undefined,
+  response: r.response ?? undefined,
+  deadline: new Date(r.deadline).getTime(),
+  createdAt: new Date(r.created_at).getTime(),
+  updatedAt: new Date(r.updated_at).getTime(),
+});
+export const mapStudent = (r: StudentRow): StudentUser => ({
+  id: r.id, role: "student", name: r.name, studentClass: r.student_class,
+  section: r.section, admission: r.admission, phone: r.phone, email: r.email,
+  createdAt: new Date(r.created_at).getTime(),
+});
+export const mapTeacher = (r: TeacherRow): TeacherUser => ({
+  id: r.id, role: "teacher", name: r.name, phone: r.phone, email: r.email,
+  createdAt: new Date(r.created_at).getTime(),
+});
+export const mapFeedback = (r: FeedbackRow): Feedback => ({
+  id: r.id, authorId: r.author_id, authorName: r.author_name,
+  text: r.text, rating: r.rating, createdAt: new Date(r.created_at).getTime(),
+});
+export const mapNotification = (r: NotificationRow): Notification => ({
+  id: r.id, userId: r.user_id, title: r.title, message: r.message,
+  read: r.read, createdAt: new Date(r.created_at).getTime(),
+});
 
-export const findComplaintByTicket = (ticketId: string): Complaint | undefined =>
-  getComplaints().find((c) => c.ticketId.toLowerCase() === ticketId.trim().toLowerCase());
+// ---------- session (cached locally) ----------
+export const getSession = (): Session | null => {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch { return null; }
+};
+export const setSession = (s: Session | null) => {
+  if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  else localStorage.removeItem(SESSION_KEY);
+  window.dispatchEvent(new CustomEvent("apsk:session"));
+};
+export const logout = () => setSession(null);
 
-// ---------- mutations ----------
-export const registerStudent = (
-  data: Omit<StudentUser, "id" | "role" | "createdAt">,
-): { ok: boolean; error?: string; user?: StudentUser } => {
-  const users = getUsers();
-  if (users.some((u) => u.role === "student" && (u as StudentUser).admission === data.admission)) {
-    return { ok: false, error: "Admission number already registered." };
-  }
-  if (users.some((u) => u.email.toLowerCase() === data.email.toLowerCase())) {
-    return { ok: false, error: "Email already registered." };
-  }
-  const user: StudentUser = { ...data, id: uid(), role: "student", createdAt: Date.now() };
-  write(KEYS.users, [...users, user]);
-  return { ok: true, user };
+// ---------- fetchers ----------
+export const fetchComplaints = async (): Promise<Complaint[]> => {
+  const { data, error } = await supabase
+    .from("complaints").select("*").order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return (data as ComplaintRow[]).map(mapComplaint);
+};
+export const fetchStudents = async (): Promise<StudentUser[]> => {
+  const { data, error } = await supabase.from("students").select("*");
+  if (error) { console.error(error); return []; }
+  return (data as StudentRow[]).map(mapStudent);
+};
+export const fetchTeachers = async (): Promise<TeacherUser[]> => {
+  const { data, error } = await supabase.from("teachers").select("*");
+  if (error) { console.error(error); return []; }
+  return (data as TeacherRow[]).map(mapTeacher);
+};
+export const fetchUsers = async (): Promise<AppUser[]> => {
+  const [s, t] = await Promise.all([fetchStudents(), fetchTeachers()]);
+  return [...s, ...t];
+};
+export const fetchFeedback = async (): Promise<Feedback[]> => {
+  const { data, error } = await supabase
+    .from("feedback").select("*").order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return (data as FeedbackRow[]).map(mapFeedback);
+};
+export const fetchNotifications = async (): Promise<Notification[]> => {
+  const { data, error } = await supabase
+    .from("notifications").select("*").order("created_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return (data as NotificationRow[]).map(mapNotification);
 };
 
-export const registerTeacher = (
-  data: Omit<TeacherUser, "id" | "role" | "createdAt">,
-): { ok: boolean; error?: string; user?: TeacherUser } => {
-  const users = getUsers();
-  if (users.some((u) => u.email.toLowerCase() === data.email.toLowerCase())) {
-    return { ok: false, error: "Email already registered." };
-  }
-  const user: TeacherUser = { ...data, id: uid(), role: "teacher", createdAt: Date.now() };
-  write(KEYS.users, [...users, user]);
-  return { ok: true, user };
+export const findComplaintByTicket = async (ticketId: string): Promise<Complaint | undefined> => {
+  const { data, error } = await supabase
+    .from("complaints").select("*")
+    .ilike("ticket_id", ticketId.trim()).maybeSingle();
+  if (error || !data) return undefined;
+  return mapComplaint(data as ComplaintRow);
 };
 
-export const loginStudent = (admission: string, password: string) => {
-  const u = getUsers().find(
-    (x) => x.role === "student" && (x as StudentUser).admission === admission && x.password === password,
-  ) as StudentUser | undefined;
-  if (!u) return { ok: false, error: "Invalid admission number or password." } as const;
-  setSession({ userId: u.id, role: "student", name: u.name });
-  return { ok: true, user: u } as const;
+// ---------- auth ----------
+export const registerStudent = async (
+  data: Omit<StudentUser, "id" | "role" | "createdAt"> & { password: string },
+): Promise<{ ok: boolean; error?: string; user?: StudentUser }> => {
+  // Check uniqueness
+  const { data: dupAdm } = await supabase.from("students").select("id")
+    .eq("admission", data.admission).maybeSingle();
+  if (dupAdm) return { ok: false, error: "Admission number already registered." };
+  const { data: dupEmail } = await supabase.from("students").select("id")
+    .ilike("email", data.email).maybeSingle();
+  if (dupEmail) return { ok: false, error: "Email already registered." };
+
+  const { data: hashData, error: hashErr } = await supabase.rpc("hash_password", { _password: data.password });
+  if (hashErr || !hashData) return { ok: false, error: hashErr?.message ?? "Password hash failed" };
+
+  const { data: inserted, error } = await supabase.from("students").insert({
+    name: data.name, student_class: data.studentClass, section: data.section,
+    admission: data.admission, phone: data.phone, email: data.email,
+    password_hash: hashData as unknown as string,
+  }).select("*").single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "Registration failed" };
+  return { ok: true, user: mapStudent(inserted as StudentRow) };
 };
 
-export const loginTeacher = (email: string, password: string) => {
-  const u = getUsers().find(
-    (x) => x.role === "teacher" && x.email.toLowerCase() === email.toLowerCase() && x.password === password,
-  ) as TeacherUser | undefined;
-  if (!u) return { ok: false, error: "Invalid email or password." } as const;
-  setSession({ userId: u.id, role: "teacher", name: u.name });
-  return { ok: true, user: u } as const;
+export const registerTeacher = async (
+  data: Omit<TeacherUser, "id" | "role" | "createdAt"> & { password: string },
+): Promise<{ ok: boolean; error?: string; user?: TeacherUser }> => {
+  const { data: dupEmail } = await supabase.from("teachers").select("id")
+    .ilike("email", data.email).maybeSingle();
+  if (dupEmail) return { ok: false, error: "Email already registered." };
+
+  const { data: hashData, error: hashErr } = await supabase.rpc("hash_password", { _password: data.password });
+  if (hashErr || !hashData) return { ok: false, error: hashErr?.message ?? "Password hash failed" };
+
+  const { data: inserted, error } = await supabase.from("teachers").insert({
+    name: data.name, phone: data.phone, email: data.email,
+    password_hash: hashData as unknown as string,
+  }).select("*").single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "Registration failed" };
+  return { ok: true, user: mapTeacher(inserted as TeacherRow) };
+};
+
+export const loginStudent = async (admission: string, password: string) => {
+  const { data } = await supabase.from("students").select("*")
+    .eq("admission", admission).maybeSingle();
+  if (!data) return { ok: false as const, error: "Invalid admission number or password." };
+  const { data: ok } = await supabase.rpc("verify_password", {
+    _password: password, _hash: (data as { password_hash: string }).password_hash,
+  });
+  if (!ok) return { ok: false as const, error: "Invalid admission number or password." };
+  const user = mapStudent(data as StudentRow);
+  setSession({ userId: user.id, role: "student", name: user.name });
+  return { ok: true as const, user };
+};
+
+export const loginTeacher = async (email: string, password: string) => {
+  const { data } = await supabase.from("teachers").select("*")
+    .ilike("email", email).maybeSingle();
+  if (!data) return { ok: false as const, error: "Invalid email or password." };
+  const { data: ok } = await supabase.rpc("verify_password", {
+    _password: password, _hash: (data as { password_hash: string }).password_hash,
+  });
+  if (!ok) return { ok: false as const, error: "Invalid email or password." };
+  const user = mapTeacher(data as TeacherRow);
+  setSession({ userId: user.id, role: "teacher", name: user.name });
+  return { ok: true as const, user };
 };
 
 export const loginAdmin = (username: string, password: string) => {
   if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-    return { ok: false, error: "Invalid admin credentials." } as const;
+    return { ok: false as const, error: "Invalid admin credentials." };
   }
   setSession({ userId: ADMIN_USER_ID, role: "admin", name: "Admin" });
-  return { ok: true } as const;
+  return { ok: true as const };
 };
 
-export const setSession = (s: Session | null) => {
-  if (s) write(KEYS.session, s);
-  else {
-    localStorage.removeItem(KEYS.session);
-    window.dispatchEvent(new CustomEvent("apsk:store", { detail: { key: KEYS.session } }));
-  }
-};
-
-export const logout = () => setSession(null);
-
-export const addComplaint = (
+// ---------- mutations ----------
+export const addComplaint = async (
   c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline">,
-): Complaint => {
+): Promise<Complaint | null> => {
+  const { data: ticketId, error: tErr } = await supabase.rpc("next_ticket_id");
+  if (tErr || !ticketId) { console.error(tErr); return null; }
   const createdAt = Date.now();
-  const complaint: Complaint = {
-    ...c,
-    id: uid(),
-    ticketId: nextTicketId(createdAt),
-    status: "pending",
-    deadline: slaDeadlineFrom(createdAt, c.urgency),
-    createdAt,
-    updatedAt: createdAt,
-  };
-  write(KEYS.complaints, [complaint, ...getComplaints()]);
-  pushNotification({
+  const deadline = new Date(slaDeadlineFrom(createdAt, c.urgency)).toISOString();
+  const { data, error } = await supabase.from("complaints").insert({
+    ticket_id: ticketId as unknown as string,
+    author_id: c.authorId, author_name: c.authorName, author_role: c.authorRole,
+    description: c.description, urgency: c.urgency, status: "pending",
+    category: c.category ?? null, subtopic: c.subtopic ?? null,
+    deadline,
+  }).select("*").single();
+  if (error || !data) { console.error(error); return null; }
+  const complaint = mapComplaint(data as ComplaintRow);
+  await pushNotification({
     userId: ADMIN_USER_ID,
     title: c.urgency === "high" ? "🚨 URGENT complaint received" : "New complaint received",
     message: `${complaint.ticketId} — ${c.authorName} (${c.authorRole})`,
@@ -239,54 +323,44 @@ export const addComplaint = (
   return complaint;
 };
 
-export const updateComplaintStatus = (
-  id: string,
-  status: Status,
-  response?: string,
+export const updateComplaintStatus = async (
+  id: string, status: Status, response?: string,
 ) => {
-  const list = getComplaints();
-  const idx = list.findIndex((c) => c.id === id);
-  if (idx === -1) return;
-  const updated: Complaint = {
-    ...list[idx],
-    status,
-    response: response ?? list[idx].response,
-    updatedAt: Date.now(),
-  };
-  list[idx] = updated;
-  write(KEYS.complaints, list);
-  pushNotification({
-    userId: updated.authorId,
-    title: `${updated.ticketId} ${status}`,
+  const patch: Record<string, unknown> = { status };
+  if (response !== undefined) patch.response = response;
+  const { data, error } = await supabase.from("complaints")
+    .update(patch).eq("id", id).select("*").single();
+  if (error || !data) { console.error(error); return; }
+  const c = mapComplaint(data as ComplaintRow);
+  await pushNotification({
+    userId: c.authorId,
+    title: `${c.ticketId} ${status}`,
     message: response ? `Admin: ${response}` : `Status updated to "${status}".`,
   });
 };
 
-export const addFeedback = (f: Omit<Feedback, "id" | "createdAt">): Feedback => {
-  const fb: Feedback = { ...f, id: uid(), createdAt: Date.now() };
-  write(KEYS.feedback, [fb, ...getFeedback()]);
-  return fb;
+export const addFeedback = async (
+  f: Omit<Feedback, "id" | "createdAt">,
+): Promise<Feedback | null> => {
+  const { data, error } = await supabase.from("feedback").insert({
+    author_id: f.authorId, author_name: f.authorName,
+    text: f.text, rating: f.rating,
+  }).select("*").single();
+  if (error || !data) { console.error(error); return null; }
+  return mapFeedback(data as FeedbackRow);
 };
 
-export const pushNotification = (n: Omit<Notification, "id" | "createdAt" | "read">) => {
-  const note: Notification = { ...n, id: uid(), read: false, createdAt: Date.now() };
-  write(KEYS.notifications, [note, ...getNotifications()]);
+export const pushNotification = async (
+  n: Omit<Notification, "id" | "createdAt" | "read">,
+) => {
+  await supabase.from("notifications").insert({
+    user_id: n.userId, title: n.title, message: n.message, read: false,
+  });
 };
 
-export const markNotificationsRead = (userId: string) => {
-  const list = getNotifications().map((n) => (n.userId === userId ? { ...n, read: true } : n));
-  write(KEYS.notifications, list);
-};
-
-// ---------- subscription ----------
-export const subscribe = (cb: () => void) => {
-  const handler = () => cb();
-  window.addEventListener("storage", handler);
-  window.addEventListener("apsk:store", handler as EventListener);
-  return () => {
-    window.removeEventListener("storage", handler);
-    window.removeEventListener("apsk:store", handler as EventListener);
-  };
+export const markNotificationsRead = async (userId: string) => {
+  await supabase.from("notifications").update({ read: true })
+    .eq("user_id", userId).eq("read", false);
 };
 
 export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
