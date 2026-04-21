@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Search, Ticket } from "lucide-react";
@@ -15,15 +15,21 @@ const TrackComplaint = () => {
   const initial = params.get("ticket") ?? "";
   const [query, setQuery] = useState(initial);
   const [submitted, setSubmitted] = useState(initial);
+  const [result, setResult] = useState<Complaint | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (initial) setSubmitted(initial);
   }, [initial]);
 
-  const result: Complaint | undefined = useMemo(
-    () => (submitted ? findComplaintByTicket(submitted) : undefined),
-    [submitted],
-  );
+  useEffect(() => {
+    if (!submitted) { setResult(undefined); return; }
+    setLoading(true);
+    findComplaintByTicket(submitted).then((r) => {
+      setResult(r);
+      setLoading(false);
+    });
+  }, [submitted]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();

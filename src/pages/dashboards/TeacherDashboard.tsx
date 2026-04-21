@@ -67,7 +67,7 @@ export const TeacherDashboard = ({ session }: Props) => {
       return toast.error("Description too short", {
         description: `Need at least 30 words (currently ${descWords}).`,
       });
-    const complaint = addComplaint({
+    const complaint = await addComplaint({
       authorId: session.userId,
       authorName: session.name,
       authorRole: "teacher",
@@ -76,6 +76,10 @@ export const TeacherDashboard = ({ session }: Props) => {
       category,
       subtopic,
     });
+    if (!complaint) {
+      toast.error("Submission failed");
+      return;
+    }
     setCategory("");
     setSubtopic("");
     setDesc("");

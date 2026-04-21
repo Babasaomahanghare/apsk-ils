@@ -41,13 +41,17 @@ export const StudentDashboard = ({ session }: Props) => {
       toast.error("Description too short", { description: `Need at least 50 words (currently ${descWords}).` });
       return;
     }
-    const complaint = addComplaint({
+    const complaint = await addComplaint({
       authorId: session.userId,
       authorName: session.name,
       authorRole: "student",
       description: desc.trim(),
       urgency,
     });
+    if (!complaint) {
+      toast.error("Submission failed");
+      return;
+    }
     setDesc("");
     setUrgency("low");
     toast.success(`✅ Submitted — ${complaint.ticketId}`, {
@@ -64,7 +68,7 @@ export const StudentDashboard = ({ session }: Props) => {
   const [fbText, setFbText] = useState("");
   const [rating, setRating] = useState(0);
   const fbWords = wordCount(fbText);
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     if (fbWords < 25) {
       toast.error("Feedback too short", { description: `Need at least 25 words (currently ${fbWords}).` });
       return;
@@ -73,7 +77,7 @@ export const StudentDashboard = ({ session }: Props) => {
       toast.error("Please rate the school infrastructure (1–5 stars).");
       return;
     }
-    addFeedback({ authorId: session.userId, authorName: session.name, text: fbText.trim(), rating });
+    await addFeedback({ authorId: session.userId, authorName: session.name, text: fbText.trim(), rating });
     setFbText("");
     setRating(0);
     toast.success("⭐ Feedback submitted");
