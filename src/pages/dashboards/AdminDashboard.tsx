@@ -284,8 +284,9 @@ export const AdminDashboard = ({ session }: Props) => {
           ) : filteredComplaints.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">No complaints match the current filters.</p>
           ) : (
+            <>
             <div className="space-y-3">
-              {filteredComplaints.map((c, i) => (
+              {pagedComplaints.map((c, i) => (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 8 }}
