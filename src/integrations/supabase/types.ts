@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      complaint_comments: {
+        Row: {
+          author_id: string
+          author_name: string
+          author_role: string
+          complaint_id: string
+          created_at: string
+          id: string
+          message: string
+        }
+        Insert: {
+          author_id: string
+          author_name: string
+          author_role: string
+          complaint_id: string
+          created_at?: string
+          id?: string
+          message: string
+        }
+        Update: {
+          author_id?: string
+          author_name?: string
+          author_role?: string
+          complaint_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complaint_comments_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       complaints: {
         Row: {
           author_id: string
