@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { DashboardShell, RoleTag, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
+import { CommentThread } from "@/components/dashboard/CommentThread";
 import { useComplaints, useUsers } from "@/hooks/useStore";
-import { updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
 
 interface Props { session: Session }
