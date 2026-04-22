@@ -368,9 +368,21 @@ export const AdminDashboard = ({ session }: Props) => {
               <div className="space-y-2">
                 {students.map((s) => (
                   <div key={s.id} className="border border-gray-200 rounded-md p-2.5 bg-white text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-navy">{s.name}</span>
-                      <RoleTag role="student" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-navy truncate">{s.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <RoleTag role="student" />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setPendingDelete({ id: s.id, name: s.name, role: "student" })}
+                          aria-label={`Delete ${s.name}`}
+                          title="Delete user permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-0.5">
                       Adm: <span className="font-mono">{s.admission}</span> · Class {s.studentClass}-{s.section}
@@ -390,9 +402,21 @@ export const AdminDashboard = ({ session }: Props) => {
               <div className="space-y-2">
                 {teachers.map((t) => (
                   <div key={t.id} className="border border-gray-200 rounded-md p-2.5 bg-white text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-navy">{t.name}</span>
-                      <RoleTag role="teacher" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-navy truncate">{t.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <RoleTag role="teacher" />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setPendingDelete({ id: t.id, name: t.name, role: "teacher" })}
+                          aria-label={`Delete ${t.name}`}
+                          title="Delete user permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-0.5 truncate">{t.email}</p>
                   </div>
@@ -402,6 +426,30 @@ export const AdminDashboard = ({ session }: Props) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete user confirmation */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{pendingDelete?.name}</strong> ({pendingDelete?.role})
+              along with <strong>all of their complaints, comments, feedback, and notifications</strong>.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? "Deleting..." : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
   );
 };
