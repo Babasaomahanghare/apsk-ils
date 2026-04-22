@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Send, ClipboardList, MessageSquare, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboar
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 import { useComplaints } from "@/hooks/useStore";
 import {
   addComplaint,
@@ -53,6 +54,11 @@ export const TeacherDashboard = ({ session }: Props) => {
     );
     return { labels, values };
   }, [mine]);
+
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(mine.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  const pagedMine = paginate(mine, page);
 
   // Form
   const [category, setCategory] = useState<Category | "">("");
@@ -219,8 +225,9 @@ export const TeacherDashboard = ({ session }: Props) => {
           {mine.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">No issues submitted yet.</p>
           ) : (
+            <>
             <div className="space-y-3">
-              {mine.map((c, i) => (
+              {pagedMine.map((c, i) => (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 8 }}
@@ -265,6 +272,8 @@ export const TeacherDashboard = ({ session }: Props) => {
                 </motion.div>
               ))}
             </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
