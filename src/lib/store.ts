@@ -385,7 +385,6 @@ export const markNotificationsRead = async (userId: string) => {
 // ---------- comments ----------
 export const fetchComments = async (complaintId: string): Promise<Comment[]> => {
   const { data, error } = await supabase
-    // @ts-expect-error - complaint_comments not yet in generated types
     .from("complaint_comments").select("*")
     .eq("complaint_id", complaintId)
     .order("created_at", { ascending: true });
@@ -397,7 +396,6 @@ export const addComment = async (
   c: Omit<Comment, "id" | "createdAt">,
 ): Promise<Comment | null> => {
   const { data, error } = await supabase
-    // @ts-expect-error - complaint_comments not yet in generated types
     .from("complaint_comments").insert({
       complaint_id: c.complaintId,
       author_id: c.authorId,
