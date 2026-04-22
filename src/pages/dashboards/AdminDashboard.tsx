@@ -94,6 +94,29 @@ export const AdminDashboard = ({ session }: Props) => {
     setRoleFilter("all"); setSlaFilter("all");
   };
 
+  // Pagination for complaints
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(filteredComplaints.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  useEffect(() => { setPage(1); }, [searchTerm, statusFilter, urgencyFilter, roleFilter, slaFilter]);
+  const pagedComplaints = paginate(filteredComplaints, page);
+
+  // User deletion
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; role: "student" | "teacher" } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const res = await deleteUser(pendingDelete.id, pendingDelete.role);
+    setDeleting(false);
+    if (!res.ok) {
+      toast.error("Failed to delete user", { description: res.error });
+      return;
+    }
+    toast.success(`🗑️ ${pendingDelete.name} deleted permanently`);
+    setPendingDelete(null);
+  };
+
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
     const response = responseDraft[id]?.trim() || undefined;
     updateComplaintStatus(id, status, response);
