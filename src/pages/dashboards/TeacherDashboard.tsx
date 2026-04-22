@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
+import { CommentThread } from "@/components/dashboard/CommentThread";
 import { useComplaints } from "@/hooks/useStore";
 import {
   addComplaint,
@@ -260,6 +261,7 @@ export const TeacherDashboard = ({ session }: Props) => {
                       <Download className="w-3 h-3 mr-1" /> PDF
                     </Button>
                   </div>
+                  <CommentThread complaintId={c.id} session={session} />
                 </motion.div>
               ))}
             </div>
