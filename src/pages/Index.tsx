@@ -100,6 +100,19 @@ const galleryItems = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
+  const [trackId, setTrackId] = useState("");
+
+  const handleTrack = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = trackId.trim();
+    if (!id) {
+      navigate("/track");
+      return;
+    }
+    navigate(`/track?id=${encodeURIComponent(id)}`);
+  };
+
   return (
     <div className="min-h-screen font-poppins relative overflow-x-hidden">
       {/* Fixed background — uses scroll attachment via fixed positioning, avoids iOS bg-fixed bugs */}
@@ -225,6 +238,53 @@ const Index = () => {
                 );
               })}
             </div>
+          </section>
+
+          {/* Track Complaint */}
+          <section className="container mx-auto px-4 pb-4 sm:pb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5 }}
+              className="max-w-3xl mx-auto"
+            >
+              <Card className="glass-card border-0 overflow-hidden">
+                <div className="bg-gradient-to-r from-gold to-yellow-600 px-5 sm:px-6 py-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/25 ring-1 ring-white/40 flex items-center justify-center shrink-0">
+                    <Ticket className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-white font-bold text-lg leading-tight">Track Your Complaint</h3>
+                    <p className="text-white/85 text-xs sm:text-sm">No login required — enter your Ticket ID to see live status.</p>
+                  </div>
+                </div>
+                <CardContent className="p-5 sm:p-6">
+                  <form onSubmit={handleTrack} className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <Input
+                        value={trackId}
+                        onChange={(e) => setTrackId(e.target.value)}
+                        placeholder="e.g. TKT-APS-2026-0001"
+                        className="pl-9 h-11 font-mono text-sm"
+                        aria-label="Ticket ID"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="h-11 bg-gradient-to-r from-gold to-yellow-600 hover:opacity-95 text-navy font-bold sm:px-6"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Track
+                    </Button>
+                  </form>
+                  <p className="mt-3 text-xs text-gray-500 text-center sm:text-left">
+                    💡 Tip: Your Ticket ID was shown after submission and emailed in your confirmation PDF.
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           </section>
 
           {/* Features */}
