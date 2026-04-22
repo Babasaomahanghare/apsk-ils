@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { DashboardShell, RoleTag, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 import { useComplaints, useUsers } from "@/hooks/useStore";
-import { slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { deleteUser, slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
 
 interface Props { session: Session }
