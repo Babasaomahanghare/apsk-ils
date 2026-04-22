@@ -382,6 +382,52 @@ export const markNotificationsRead = async (userId: string) => {
     .eq("user_id", userId).eq("read", false);
 };
 
+// ---------- comments ----------
+export const fetchComments = async (complaintId: string): Promise<Comment[]> => {
+  const { data, error } = await supabase
+    // @ts-expect-error - complaint_comments not yet in generated types
+    .from("complaint_comments").select("*")
+    .eq("complaint_id", complaintId)
+    .order("created_at", { ascending: true });
+  if (error) { console.error(error); return []; }
+  return (data as unknown as CommentRow[]).map(mapComment);
+};
+
+export const addComment = async (
+  c: Omit<Comment, "id" | "createdAt">,
+): Promise<Comment | null> => {
+  const { data, error } = await supabase
+    // @ts-expect-error - complaint_comments not yet in generated types
+    .from("complaint_comments").insert({
+      complaint_id: c.complaintId,
+      author_id: c.authorId,
+      author_name: c.authorName,
+      author_role: c.authorRole,
+      message: c.message,
+    }).select("*").single();
+  if (error || !data) { console.error(error); return null; }
+  // Notify the other party
+  const { data: parent } = await supabase.from("complaints")
+    .select("ticket_id, author_id").eq("id", c.complaintId).maybeSingle();
+  if (parent) {
+    const p = parent as { ticket_id: string; author_id: string };
+    if (c.authorRole === "admin") {
+      await pushNotification({
+        userId: p.author_id,
+        title: `💬 New reply on ${p.ticket_id}`,
+        message: c.message.slice(0, 120),
+      });
+    } else {
+      await pushNotification({
+        userId: ADMIN_USER_ID,
+        title: `💬 ${c.authorName} replied on ${p.ticket_id}`,
+        message: c.message.slice(0, 120),
+      });
+    }
+  }
+  return mapComment(data as unknown as CommentRow);
+};
+
 export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 export const initialsOf = (name: string) =>
   name
