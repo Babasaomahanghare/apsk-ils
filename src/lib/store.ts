@@ -63,6 +63,16 @@ export interface Notification {
   createdAt: number;
 }
 
+export interface Comment {
+  id: string;
+  complaintId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: "student" | "teacher" | "admin";
+  message: string;
+  createdAt: number;
+}
+
 export interface Session {
   userId: string;
   role: Role;
@@ -131,6 +141,10 @@ type NotificationRow = {
   id: string; user_id: string; title: string; message: string;
   read: boolean; created_at: string;
 };
+type CommentRow = {
+  id: string; complaint_id: string; author_id: string; author_name: string;
+  author_role: "student" | "teacher" | "admin"; message: string; created_at: string;
+};
 
 export const mapComplaint = (r: ComplaintRow): Complaint => ({
   id: r.id,
@@ -164,6 +178,11 @@ export const mapFeedback = (r: FeedbackRow): Feedback => ({
 export const mapNotification = (r: NotificationRow): Notification => ({
   id: r.id, userId: r.user_id, title: r.title, message: r.message,
   read: r.read, createdAt: new Date(r.created_at).getTime(),
+});
+export const mapComment = (r: CommentRow): Comment => ({
+  id: r.id, complaintId: r.complaint_id, authorId: r.author_id,
+  authorName: r.author_name, authorRole: r.author_role,
+  message: r.message, createdAt: new Date(r.created_at).getTime(),
 });
 
 // ---------- session (cached locally) ----------
