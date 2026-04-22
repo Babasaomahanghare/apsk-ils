@@ -13,10 +13,15 @@ import {
   MapPin,
   Image as ImageIcon,
   BadgeCheck,
+  Search,
+  Ticket,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Disclaimer } from "@/components/Disclaimer";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 type Role = "student" | "teacher" | "admin";
 import campusHero from "@/assets/campus-hero.jpg";

@@ -204,7 +204,14 @@ export const fetchComplaints = async (): Promise<Complaint[]> => {
   const { data, error } = await supabase
     .from("complaints").select("*").order("created_at", { ascending: false });
   if (error) { console.error(error); return []; }
-  return (data as ComplaintRow[]).map(mapComplaint);
+  const all = (data as ComplaintRow[]).map(mapComplaint);
+  // Auto-hide closed complaints (resolved/rejected) after 4 days from last update.
+  // Data stays in the DB for audit; just hidden from the frontend.
+  const cutoff = Date.now() - 4 * 24 * 3600 * 1000;
+  return all.filter((c) => {
+    if (c.status === "pending") return true;
+    return c.updatedAt >= cutoff;
+  });
 };
 export const fetchStudents = async (): Promise<StudentUser[]> => {
   const { data, error } = await supabase.from("students").select("*");
