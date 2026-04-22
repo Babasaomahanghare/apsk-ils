@@ -382,6 +382,27 @@ export const markNotificationsRead = async (userId: string) => {
     .eq("user_id", userId).eq("read", false);
 };
 
+// ---------- user deletion (admin only) ----------
+// Permanently deletes a student or teacher and all their associated data
+// (their complaints will cascade-delete their comments via FK).
+export const deleteUser = async (
+  userId: string,
+  role: "student" | "teacher",
+): Promise<{ ok: boolean; error?: string }> => {
+  // Delete the user's complaints first (comments cascade automatically)
+  const { error: cErr } = await supabase.from("complaints").delete().eq("author_id", userId);
+  if (cErr) return { ok: false, error: cErr.message };
+  // Delete their notifications
+  await supabase.from("notifications").delete().eq("user_id", userId);
+  // Delete their feedback
+  await supabase.from("feedback").delete().eq("author_id", userId);
+  // Finally delete the user record
+  const table = role === "student" ? "students" : "teachers";
+  const { error } = await supabase.from(table).delete().eq("id", userId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+};
+
 // ---------- comments ----------
 export const fetchComments = async (complaintId: string): Promise<Comment[]> => {
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Send, Star, MessageSquare, ClipboardList, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboar
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, LineChartCard, buildLast7Days } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 import { useComplaints } from "@/hooks/useStore";
 import { addComplaint, addFeedback, wordCount, type Session, type Urgency } from "@/lib/store";
 import { generateTicketPdf } from "@/lib/ticketPdf";
@@ -31,6 +32,11 @@ export const StudentDashboard = ({ session }: Props) => {
   }, [mine]);
 
   const trend = useMemo(() => buildLast7Days(mine.map((c) => c.createdAt)), [mine]);
+
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(mine.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  const pagedMine = paginate(mine, page);
 
   // Complaint form
   const [desc, setDesc] = useState("");
@@ -226,8 +232,9 @@ export const StudentDashboard = ({ session }: Props) => {
           {mine.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">You haven't submitted any complaints yet.</p>
           ) : (
+            <>
             <div className="space-y-3">
-              {mine.map((c, i) => (
+              {pagedMine.map((c, i) => (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 8 }}
@@ -267,6 +274,8 @@ export const StudentDashboard = ({ session }: Props) => {
                 </motion.div>
               ))}
             </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            </>
           )}
         </CardContent>
       </Card>

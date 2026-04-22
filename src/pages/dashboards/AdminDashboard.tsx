@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { DashboardShell, RoleTag, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 import { useComplaints, useUsers } from "@/hooks/useStore";
-import { slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { deleteUser, slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
 
 interface Props { session: Session }
@@ -87,6 +92,29 @@ export const AdminDashboard = ({ session }: Props) => {
   const clearFilters = () => {
     setSearchTerm(""); setStatusFilter("all"); setUrgencyFilter("all");
     setRoleFilter("all"); setSlaFilter("all");
+  };
+
+  // Pagination for complaints
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(filteredComplaints.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  useEffect(() => { setPage(1); }, [searchTerm, statusFilter, urgencyFilter, roleFilter, slaFilter]);
+  const pagedComplaints = paginate(filteredComplaints, page);
+
+  // User deletion
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; role: "student" | "teacher" } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const res = await deleteUser(pendingDelete.id, pendingDelete.role);
+    setDeleting(false);
+    if (!res.ok) {
+      toast.error("Failed to delete user", { description: res.error });
+      return;
+    }
+    toast.success(`🗑️ ${pendingDelete.name} deleted permanently`);
+    setPendingDelete(null);
   };
 
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
@@ -256,8 +284,9 @@ export const AdminDashboard = ({ session }: Props) => {
           ) : filteredComplaints.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">No complaints match the current filters.</p>
           ) : (
+            <>
             <div className="space-y-3">
-              {filteredComplaints.map((c, i) => (
+              {pagedComplaints.map((c, i) => (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 8 }}
@@ -315,6 +344,8 @@ export const AdminDashboard = ({ session }: Props) => {
                 </motion.div>
               ))}
             </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -337,9 +368,21 @@ export const AdminDashboard = ({ session }: Props) => {
               <div className="space-y-2">
                 {students.map((s) => (
                   <div key={s.id} className="border border-gray-200 rounded-md p-2.5 bg-white text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-navy">{s.name}</span>
-                      <RoleTag role="student" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-navy truncate">{s.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <RoleTag role="student" />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setPendingDelete({ id: s.id, name: s.name, role: "student" })}
+                          aria-label={`Delete ${s.name}`}
+                          title="Delete user permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-0.5">
                       Adm: <span className="font-mono">{s.admission}</span> · Class {s.studentClass}-{s.section}
@@ -359,9 +402,21 @@ export const AdminDashboard = ({ session }: Props) => {
               <div className="space-y-2">
                 {teachers.map((t) => (
                   <div key={t.id} className="border border-gray-200 rounded-md p-2.5 bg-white text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-navy">{t.name}</span>
-                      <RoleTag role="teacher" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-navy truncate">{t.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <RoleTag role="teacher" />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setPendingDelete({ id: t.id, name: t.name, role: "teacher" })}
+                          aria-label={`Delete ${t.name}`}
+                          title="Delete user permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-0.5 truncate">{t.email}</p>
                   </div>
@@ -371,6 +426,30 @@ export const AdminDashboard = ({ session }: Props) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete user confirmation */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{pendingDelete?.name}</strong> ({pendingDelete?.role})
+              along with <strong>all of their complaints, comments, feedback, and notifications</strong>.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? "Deleting..." : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardShell>
   );
 };
