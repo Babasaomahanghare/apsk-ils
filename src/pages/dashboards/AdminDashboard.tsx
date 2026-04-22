@@ -62,6 +62,33 @@ export const AdminDashboard = ({ session }: Props) => {
 
   const [responseDraft, setResponseDraft] = useState<Record<string, string>>({});
 
+  // Filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "resolved" | "rejected">("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<"all" | "low" | "medium" | "high">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "student" | "teacher">("all");
+  const [slaFilter, setSlaFilter] = useState<"all" | "ontime" | "near" | "overdue" | "done">("all");
+
+  const filteredComplaints = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return complaints.filter((c) => {
+      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      if (urgencyFilter !== "all" && c.urgency !== urgencyFilter) return false;
+      if (roleFilter !== "all" && c.authorRole !== roleFilter) return false;
+      if (slaFilter !== "all" && slaState(c) !== slaFilter) return false;
+      if (q && !c.ticketId.toLowerCase().includes(q) && !c.authorName.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [complaints, searchTerm, statusFilter, urgencyFilter, roleFilter, slaFilter]);
+
+  const filtersActive =
+    searchTerm !== "" || statusFilter !== "all" || urgencyFilter !== "all" ||
+    roleFilter !== "all" || slaFilter !== "all";
+  const clearFilters = () => {
+    setSearchTerm(""); setStatusFilter("all"); setUrgencyFilter("all");
+    setRoleFilter("all"); setSlaFilter("all");
+  };
+
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
     const response = responseDraft[id]?.trim() || undefined;
     updateComplaintStatus(id, status, response);
