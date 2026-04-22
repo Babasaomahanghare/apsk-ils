@@ -311,6 +311,7 @@ export const AdminDashboard = ({ session }: Props) => {
                       </Button>
                     </div>
                   </div>
+                  <CommentThread complaintId={c.id} session={session} />
                 </motion.div>
               ))}
             </div>
