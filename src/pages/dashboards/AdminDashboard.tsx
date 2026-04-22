@@ -344,6 +344,8 @@ export const AdminDashboard = ({ session }: Props) => {
                 </motion.div>
               ))}
             </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            </>
           )}
         </CardContent>
       </Card>
