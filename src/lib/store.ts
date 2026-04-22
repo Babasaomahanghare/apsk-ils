@@ -63,6 +63,16 @@ export interface Notification {
   createdAt: number;
 }
 
+export interface Comment {
+  id: string;
+  complaintId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: "student" | "teacher" | "admin";
+  message: string;
+  createdAt: number;
+}
+
 export interface Session {
   userId: string;
   role: Role;
@@ -131,6 +141,10 @@ type NotificationRow = {
   id: string; user_id: string; title: string; message: string;
   read: boolean; created_at: string;
 };
+type CommentRow = {
+  id: string; complaint_id: string; author_id: string; author_name: string;
+  author_role: "student" | "teacher" | "admin"; message: string; created_at: string;
+};
 
 export const mapComplaint = (r: ComplaintRow): Complaint => ({
   id: r.id,
@@ -164,6 +178,11 @@ export const mapFeedback = (r: FeedbackRow): Feedback => ({
 export const mapNotification = (r: NotificationRow): Notification => ({
   id: r.id, userId: r.user_id, title: r.title, message: r.message,
   read: r.read, createdAt: new Date(r.created_at).getTime(),
+});
+export const mapComment = (r: CommentRow): Comment => ({
+  id: r.id, complaintId: r.complaint_id, authorId: r.author_id,
+  authorName: r.author_name, authorRole: r.author_role,
+  message: r.message, createdAt: new Date(r.created_at).getTime(),
 });
 
 // ---------- session (cached locally) ----------
@@ -361,6 +380,50 @@ export const pushNotification = async (
 export const markNotificationsRead = async (userId: string) => {
   await supabase.from("notifications").update({ read: true })
     .eq("user_id", userId).eq("read", false);
+};
+
+// ---------- comments ----------
+export const fetchComments = async (complaintId: string): Promise<Comment[]> => {
+  const { data, error } = await supabase
+    .from("complaint_comments").select("*")
+    .eq("complaint_id", complaintId)
+    .order("created_at", { ascending: true });
+  if (error) { console.error(error); return []; }
+  return (data as unknown as CommentRow[]).map(mapComment);
+};
+
+export const addComment = async (
+  c: Omit<Comment, "id" | "createdAt">,
+): Promise<Comment | null> => {
+  const { data, error } = await supabase
+    .from("complaint_comments").insert({
+      complaint_id: c.complaintId,
+      author_id: c.authorId,
+      author_name: c.authorName,
+      author_role: c.authorRole,
+      message: c.message,
+    }).select("*").single();
+  if (error || !data) { console.error(error); return null; }
+  // Notify the other party
+  const { data: parent } = await supabase.from("complaints")
+    .select("ticket_id, author_id").eq("id", c.complaintId).maybeSingle();
+  if (parent) {
+    const p = parent as { ticket_id: string; author_id: string };
+    if (c.authorRole === "admin") {
+      await pushNotification({
+        userId: p.author_id,
+        title: `💬 New reply on ${p.ticket_id}`,
+        message: c.message.slice(0, 120),
+      });
+    } else {
+      await pushNotification({
+        userId: ADMIN_USER_ID,
+        title: `💬 ${c.authorName} replied on ${p.ticket_id}`,
+        message: c.message.slice(0, 120),
+      });
+    }
+  }
+  return mapComment(data as unknown as CommentRow);
 };
 
 export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;

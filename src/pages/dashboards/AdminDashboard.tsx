@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { DashboardShell, RoleTag, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
+import { CommentThread } from "@/components/dashboard/CommentThread";
 import { useComplaints, useUsers } from "@/hooks/useStore";
-import { updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
 
 interface Props { session: Session }
@@ -59,6 +61,33 @@ export const AdminDashboard = ({ session }: Props) => {
   const teachers = users.filter((u) => u.role === "teacher") as TeacherUser[];
 
   const [responseDraft, setResponseDraft] = useState<Record<string, string>>({});
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "resolved" | "rejected">("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<"all" | "low" | "medium" | "high">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "student" | "teacher">("all");
+  const [slaFilter, setSlaFilter] = useState<"all" | "ontime" | "near" | "overdue" | "done">("all");
+
+  const filteredComplaints = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return complaints.filter((c) => {
+      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      if (urgencyFilter !== "all" && c.urgency !== urgencyFilter) return false;
+      if (roleFilter !== "all" && c.authorRole !== roleFilter) return false;
+      if (slaFilter !== "all" && slaState(c) !== slaFilter) return false;
+      if (q && !c.ticketId.toLowerCase().includes(q) && !c.authorName.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [complaints, searchTerm, statusFilter, urgencyFilter, roleFilter, slaFilter]);
+
+  const filtersActive =
+    searchTerm !== "" || statusFilter !== "all" || urgencyFilter !== "all" ||
+    roleFilter !== "all" || slaFilter !== "all";
+  const clearFilters = () => {
+    setSearchTerm(""); setStatusFilter("all"); setUrgencyFilter("all");
+    setRoleFilter("all"); setSlaFilter("all");
+  };
 
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
     const response = responseDraft[id]?.trim() || undefined;
@@ -141,16 +170,19 @@ export const AdminDashboard = ({ session }: Props) => {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle className="text-base text-navy flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-indigo-600" /> All Complaints ({complaints.length})
+              <ClipboardList className="w-4 h-4 text-indigo-600" /> All Complaints ({filteredComplaints.length}
+              {filtersActive && complaints.length !== filteredComplaints.length && (
+                <span className="text-gray-400 font-normal"> / {complaints.length}</span>
+              )})
             </CardTitle>
             <Button
               size="sm"
               onClick={() => {
-                if (complaints.length === 0) {
+                if (filteredComplaints.length === 0) {
                   toast.error("No complaints to export.");
                   return;
                 }
-                exportComplaintsXlsx(complaints, users);
+                exportComplaintsXlsx(filteredComplaints, users);
                 toast.success("📊 Excel export downloaded");
               }}
               className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
@@ -158,13 +190,74 @@ export const AdminDashboard = ({ session }: Props) => {
               <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
             </Button>
           </div>
+          {/* Filters */}
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by Ticket ID or name..."
+                className="pl-8 h-9 text-sm bg-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={urgencyFilter} onValueChange={(v) => setUrgencyFilter(v as typeof urgencyFilter)}>
+                <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All urgencies</SelectItem>
+                  <SelectItem value="high">High (Urgent)</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)}>
+                <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  <SelectItem value="student">Students</SelectItem>
+                  <SelectItem value="teacher">Teachers</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={slaFilter} onValueChange={(v) => setSlaFilter(v as typeof slaFilter)}>
+                <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All SLA</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="near">Near deadline</SelectItem>
+                  <SelectItem value="ontime">On time</SelectItem>
+                  <SelectItem value="done">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+              >
+                <FilterX className="w-3.5 h-3.5" /> Clear filters
+              </button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {complaints.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-6">No complaints submitted yet.</p>
+          ) : filteredComplaints.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-6">No complaints match the current filters.</p>
           ) : (
             <div className="space-y-3">
-              {complaints.map((c, i) => (
+              {filteredComplaints.map((c, i) => (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 8 }}
@@ -218,6 +311,7 @@ export const AdminDashboard = ({ session }: Props) => {
                       </Button>
                     </div>
                   </div>
+                  <CommentThread complaintId={c.id} session={session} />
                 </motion.div>
               ))}
             </div>

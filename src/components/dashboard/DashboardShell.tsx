@@ -1,11 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, LogOut } from "lucide-react";
+import { Bell, LogOut, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import campusHero from "@/assets/campus-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { initialsOf, logout, markNotificationsRead, type Session } from "@/lib/store";
-import { useNotifications } from "@/hooks/useStore";
+import { useNotifications, usePresence } from "@/hooks/useStore";
 import { toast } from "sonner";
 
 interface Props {
@@ -20,6 +20,7 @@ export const DashboardShell = ({ session, gradient, roleLabel, children }: Props
   const allNotes = useNotifications();
   const myNotes = allNotes.filter((n) => n.userId === session.userId);
   const unread = myNotes.filter((n) => !n.read).length;
+  const presence = usePresence(session);
   const [open, setOpen] = useState(false);
   const [welcomed, setWelcomed] = useState(false);
 
@@ -69,6 +70,14 @@ export const DashboardShell = ({ session, gradient, roleLabel, children }: Props
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Presence pill */}
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold"
+              title={`${presence.student} student(s), ${presence.teacher} teacher(s), ${presence.admin} admin(s) online`}
+            >
+              <Circle className="w-2 h-2 fill-emerald-400 text-emerald-400 animate-pulse" />
+              <span>{presence.total} online</span>
+            </div>
             <div className="relative">
               <Button
                 size="icon"

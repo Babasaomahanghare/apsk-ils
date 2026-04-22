@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { DashboardShell, StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, LineChartCard, buildLast7Days } from "@/components/dashboard/Charts";
+import { CommentThread } from "@/components/dashboard/CommentThread";
 import { useComplaints } from "@/hooks/useStore";
 import { addComplaint, addFeedback, wordCount, type Session, type Urgency } from "@/lib/store";
 import { generateTicketPdf } from "@/lib/ticketPdf";
@@ -262,6 +263,7 @@ export const StudentDashboard = ({ session }: Props) => {
                       <Download className="w-3 h-3 mr-1" /> PDF
                     </Button>
                   </div>
+                  <CommentThread complaintId={c.id} session={session} />
                 </motion.div>
               ))}
             </div>
