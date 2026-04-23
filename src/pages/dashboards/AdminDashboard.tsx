@@ -500,3 +500,79 @@ export const AdminDashboard = ({ session }: Props) => {
     </DashboardShell>
   );
 };
+
+/* ---------------- Activity Log Panel (Super Admin) ---------------- */
+interface LogPanelProps { logs: ReturnType<typeof useActivityLogs> }
+const ActivityLogPanel = ({ logs }: LogPanelProps) => {
+  const [roleF, setRoleF] = useState<string>("all");
+  const [actionF, setActionF] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => logs.filter((l) => {
+    if (roleF !== "all" && !l.userRole.startsWith(roleF)) return false;
+    if (actionF !== "all" && !l.action.startsWith(actionF)) return false;
+    return true;
+  }), [logs, roleF, actionF]);
+
+  const totalPages = totalPagesOf(filtered.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  useEffect(() => { setPage(1); }, [roleF, actionF]);
+  const paged = paginate(filtered, page);
+
+  return (
+    <Card className="glass-card border-0">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-navy flex items-center gap-2">
+          <Activity className="w-4 h-4 text-indigo-600" /> Activity Logs ({filtered.length}
+          {filtered.length !== logs.length && <span className="text-gray-400 font-normal"> / {logs.length}</span>})
+        </CardTitle>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <Select value={roleF} onValueChange={setRoleF}>
+            <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="admin">Admin (any)</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={actionF} onValueChange={setActionF}>
+            <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All actions</SelectItem>
+              <SelectItem value="auth">Logins</SelectItem>
+              <SelectItem value="complaint">Complaint changes</SelectItem>
+              <SelectItem value="user">User management</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">No activity logged yet.</p>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              {paged.map((l) => (
+                <div key={l.id} className="flex items-start gap-2 text-xs border border-gray-200 rounded-md p-2 bg-white">
+                  <span className="font-mono text-[10px] text-gray-500 shrink-0 w-32">
+                    {new Date(l.createdAt).toLocaleString()}
+                  </span>
+                  <span className="font-semibold text-navy shrink-0">{l.userName}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wide text-indigo-700 shrink-0">
+                    {l.userRole}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wide text-amber-700 shrink-0">
+                    {l.action}
+                  </span>
+                  <span className="text-gray-700 truncate">{l.details}</span>
+                </div>
+              ))}
+            </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
