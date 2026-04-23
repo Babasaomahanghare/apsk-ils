@@ -153,6 +153,9 @@ type ComplaintRow = {
   author_role: "student" | "teacher"; description: string; urgency: Urgency;
   status: Status; category: string | null; subtopic: string | null;
   response: string | null; deadline: string; created_at: string; updated_at: string;
+  assigned_to: AssignedTo;
+  handled_by: string | null; handled_role: string | null;
+  resolved_at: string | null;
 };
 type StudentRow = {
   id: string; name: string; student_class: string; section: string;
@@ -189,6 +192,10 @@ export const mapComplaint = (r: ComplaintRow): Complaint => ({
   deadline: new Date(r.deadline).getTime(),
   createdAt: new Date(r.created_at).getTime(),
   updatedAt: new Date(r.updated_at).getTime(),
+  assignedTo: r.assigned_to ?? "UNASSIGNED",
+  handledBy: r.handled_by ?? undefined,
+  handledRole: r.handled_role ?? undefined,
+  resolvedAt: r.resolved_at ? new Date(r.resolved_at).getTime() : undefined,
 });
 export const mapStudent = (r: StudentRow): StudentUser => ({
   id: r.id, role: "student", name: r.name, studentClass: r.student_class,
