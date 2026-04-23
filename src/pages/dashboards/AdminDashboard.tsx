@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2, FileText, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +15,27 @@ import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
-import { useComplaints, useUsers } from "@/hooks/useStore";
-import { deleteUser, slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { useComplaints, useUsers, useActivityLogs } from "@/hooks/useStore";
+import { deleteUser, slaState, updateComplaintStatus, adminScope, ADMIN_ROLE_LABEL,
+  type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
+import { generateSlaReportPdf } from "@/lib/slaReport";
 
 interface Props { session: Session }
 
 export const AdminDashboard = ({ session }: Props) => {
-  const complaintsRaw = useComplaints();
+  // Default to "super" if somehow missing (legacy session) — defensive only.
+  const adminRole = session.adminRole ?? "super";
+  const isSuper = adminRole === "super";
+  const scope = adminScope(adminRole); // null for super
+  const allComplaints = useComplaints();
+  // Scope filter: ATL Lab sees only ATL_LAB; Officer sees only ADMIN_OFFICER; Super sees all.
+  const complaintsRaw = useMemo(
+    () => (scope ? allComplaints.filter((c) => c.assignedTo === scope) : allComplaints),
+    [allComplaints, scope],
+  );
   const users = useUsers();
+  const logs = useActivityLogs();
 
   // Sort: pending+urgent first, then by createdAt desc
   const complaints = useMemo(() => {
@@ -119,13 +131,13 @@ export const AdminDashboard = ({ session }: Props) => {
 
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
     const response = responseDraft[id]?.trim() || undefined;
-    updateComplaintStatus(id, status, response);
+    updateComplaintStatus(id, status, response, session.name, `admin:${adminRole}`);
     setResponseDraft((d) => ({ ...d, [id]: "" }));
     toast.success(`Marked as ${status}`);
   };
 
   return (
-    <DashboardShell session={session} gradient="from-purple-500 to-indigo-600" roleLabel="Administrator">
+    <DashboardShell session={session} gradient="from-purple-500 to-indigo-600" roleLabel={ADMIN_ROLE_LABEL[adminRole]}>
       {/* Urgent alert banner */}
       {urgentPending.length > 0 && (
         <motion.div
