@@ -361,7 +361,7 @@ export const loginAdmin = (username: string, password: string) => {
 
 // ---------- mutations ----------
 export const addComplaint = async (
-  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline">,
+  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline" | "assignedTo" | "handledBy" | "handledRole" | "resolvedAt">,
 ): Promise<Complaint | null> => {
   const { data: ticketId, error: tErr } = await supabase.rpc("next_ticket_id");
   if (tErr || !ticketId) { console.error(tErr); return null; }
@@ -385,10 +385,17 @@ export const addComplaint = async (
 };
 
 export const updateComplaintStatus = async (
-  id: string, status: Status, response?: string,
+  id: string, status: Status, response?: string, handledBy?: string, handledRole?: string,
 ) => {
-  const patch: { status: Status; response?: string } =
-    response !== undefined ? { status, response } : { status };
+  const patch: { status: Status; response?: string; handled_by?: string | null; handled_role?: string | null } = { status };
+  if (response !== undefined) patch.response = response;
+  if (status === "pending") {
+    patch.handled_by = null;
+    patch.handled_role = null;
+  } else {
+    if (handledBy) patch.handled_by = handledBy;
+    if (handledRole) patch.handled_role = handledRole;
+  }
   const { data, error } = await supabase.from("complaints")
     .update(patch).eq("id", id).select("*").single();
   if (error || !data) { console.error(error); return; }
@@ -397,6 +404,14 @@ export const updateComplaintStatus = async (
     userId: c.authorId,
     title: `${c.ticketId} ${status}`,
     message: response ? `Admin: ${response}` : `Status updated to "${status}".`,
+  });
+  await logAction({
+    userId: handledBy ?? ADMIN_USER_ID,
+    userName: handledBy ?? "Admin",
+    userRole: handledRole ?? "admin",
+    action: `complaint.${status}`,
+    details: `${c.ticketId} → ${status}${response ? `: ${response.slice(0, 80)}` : ""}`,
+    complaintId: c.id,
   });
 };
 
