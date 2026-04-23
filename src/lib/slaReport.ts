@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Complaint } from "./store";
+import { APSK_LOGO_BASE64 } from "@/assets/apsk-logo-base64";
 
 const fmtMs = (ms: number) => {
   if (ms <= 0) return "0m";
@@ -17,20 +18,29 @@ const fmtMs = (ms: number) => {
 export async function generateSlaReportPdf(complaints: Complaint[], scopeLabel: string) {
   const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
   const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
 
   // Header
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, W, 70, "F");
   doc.setFillColor(234, 179, 8);
   doc.rect(0, 70, W, 4, "F");
+
+  // APSK crest — top-left corner of header
+  try {
+    doc.addImage(APSK_LOGO_BASE64, "JPEG", 18, 8, 54, 54);
+  } catch (e) {
+    console.warn("Could not embed APSK logo in PDF header", e);
+  }
+
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("APSK ILS — SLA & Complaints Report", 30, 32);
+  doc.text("APSK ILS — SLA & Complaints Report", 88, 32);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(186, 230, 253);
-  doc.text(`Scope: ${scopeLabel}   •   Generated: ${new Date().toLocaleString()}   •   Rows: ${complaints.length}`, 30, 54);
+  doc.text(`Scope: ${scopeLabel}   •   Generated: ${new Date().toLocaleString()}   •   Rows: ${complaints.length}`, 88, 54);
 
   // Summary stats
   const total = complaints.length;
@@ -86,6 +96,26 @@ export async function generateSlaReportPdf(complaints: Complaint[], scopeLabel: 
           d.cell.styles.textColor = [16, 185, 129];
           d.cell.styles.fontStyle = "bold";
         }
+      }
+    },
+    // After every page is laid out, draw the faded centre watermark.
+    didDrawPage: () => {
+      try {
+        const wmW = 320;
+        const wmH = 320;
+        const x = (W - wmW) / 2;
+        const y = (H - wmH) / 2;
+        const gState = new (
+          doc as unknown as { GState: new (o: { opacity: number }) => unknown }
+        ).GState({ opacity: 0.08 });
+        (doc as unknown as { setGState: (s: unknown) => void }).setGState(gState);
+        doc.addImage(APSK_LOGO_BASE64, "JPEG", x, y, wmW, wmH);
+        const reset = new (
+          doc as unknown as { GState: new (o: { opacity: number }) => unknown }
+        ).GState({ opacity: 1 });
+        (doc as unknown as { setGState: (s: unknown) => void }).setGState(reset);
+      } catch (e) {
+        console.warn("Watermark draw failed", e);
       }
     },
   });

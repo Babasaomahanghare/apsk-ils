@@ -310,6 +310,14 @@ export const registerStudent = async (
 export const registerTeacher = async (
   data: Omit<TeacherUser, "id" | "role" | "createdAt"> & { password: string },
 ): Promise<{ ok: boolean; error?: string; user?: TeacherUser }> => {
+  // Whitelist enforcement (also re-checked here even if frontend bypassed).
+  const emailNorm = data.email.trim().toLowerCase();
+  const { data: approved } = await supabase.from("approved_teachers")
+    .select("id").eq("email", emailNorm).maybeSingle();
+  if (!approved) {
+    return { ok: false, error: "Unauthorized email. Contact admin to be added to the approved list." };
+  }
+
   const { data: dupEmail } = await supabase.from("teachers").select("id")
     .ilike("email", data.email).maybeSingle();
   if (dupEmail) return { ok: false, error: "Email already registered." };
@@ -323,6 +331,66 @@ export const registerTeacher = async (
   }).select("*").single();
   if (error || !inserted) return { ok: false, error: error?.message ?? "Registration failed" };
   return { ok: true, user: mapTeacher(inserted as TeacherRow) };
+};
+
+// ---------- approved teacher emails (whitelist) ----------
+export interface ApprovedTeacher {
+  id: string;
+  email: string;
+  addedAt: number;
+}
+type ApprovedTeacherRow = { id: string; email: string; added_at: string };
+const mapApproved = (r: ApprovedTeacherRow): ApprovedTeacher => ({
+  id: r.id, email: r.email, addedAt: new Date(r.added_at).getTime(),
+});
+
+export const fetchApprovedTeachers = async (): Promise<ApprovedTeacher[]> => {
+  const { data, error } = await supabase
+    .from("approved_teachers").select("*").order("added_at", { ascending: false });
+  if (error) { console.error(error); return []; }
+  return (data as ApprovedTeacherRow[]).map(mapApproved);
+};
+
+export const isEmailApproved = async (email: string): Promise<boolean> => {
+  const e = email.trim().toLowerCase();
+  if (!e) return false;
+  const { data } = await supabase.from("approved_teachers")
+    .select("id").eq("email", e).maybeSingle();
+  return !!data;
+};
+
+export const addApprovedTeacher = async (
+  email: string,
+): Promise<{ ok: boolean; error?: string }> => {
+  const e = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+    return { ok: false, error: "Please enter a valid email address." };
+  }
+  const { error } = await supabase.from("approved_teachers").insert({ email: e });
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) {
+      return { ok: false, error: "This email is already on the approved list." };
+    }
+    return { ok: false, error: error.message };
+  }
+  await logAction({
+    userId: ADMIN_USER_ID, userName: "Admin", userRole: "admin",
+    action: "whitelist.add", details: `Approved teacher email: ${e}`,
+  });
+  return { ok: true };
+};
+
+export const removeApprovedTeacher = async (
+  id: string,
+  email: string,
+): Promise<{ ok: boolean; error?: string }> => {
+  const { error } = await supabase.from("approved_teachers").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  await logAction({
+    userId: ADMIN_USER_ID, userName: "Admin", userRole: "admin",
+    action: "whitelist.remove", details: `Revoked teacher email: ${email}`,
+  });
+  return { ok: true };
 };
 
 export const loginStudent = async (admission: string, password: string) => {

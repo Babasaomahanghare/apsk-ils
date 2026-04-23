@@ -74,6 +74,24 @@ export type Database = {
         }
         Relationships: []
       }
+      approved_teachers: {
+        Row: {
+          added_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          added_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          added_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       complaint_comments: {
         Row: {
           author_id: string

@@ -13,7 +13,7 @@ import {
   validatePassword,
   type FieldErrors,
 } from "@/lib/validation";
-import { loginTeacher, registerTeacher } from "@/lib/store";
+import { loginTeacher, registerTeacher, isEmailApproved } from "@/lib/store";
 
 const TeacherAuth = () => {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ const TeacherAuth = () => {
   const runValidation = () => {
     setValidating(true);
     setValidated(false);
-    setTimeout(() => {
+    setTimeout(async () => {
       const next: FieldErrors = {};
       const nameErr = validateName(form.name);
       if (nameErr) next.name = nameErr;
@@ -47,14 +47,26 @@ const TeacherAuth = () => {
       const pwdErr = validatePassword(form.password);
       if (pwdErr) next.password = pwdErr;
 
+      // Whitelist check — only approved teacher emails may register.
+      if (!next.email) {
+        const approved = await isEmailApproved(form.email);
+        if (!approved) {
+          next.email = "Email not authorized. Contact admin.";
+        }
+      }
+
       setErrors(next);
       setValidating(false);
 
       if (Object.keys(next).length === 0) {
         setValidated(true);
-        toast.success("All details verified successfully");
+        toast.success("Email verified. You can register.");
       } else {
-        toast.error("Validation failed", { description: "Please fix the highlighted fields." });
+        toast.error("Validation failed", {
+          description: next.email === "Email not authorized. Contact admin."
+            ? "Email not authorized. Contact admin."
+            : "Please fix the highlighted fields.",
+        });
       }
     }, 900);
   };

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { AppUser, Complaint, StudentUser, TeacherUser } from "./store";
+import { APSK_LOGO_BASE64 } from "@/assets/apsk-logo-base64";
 
 export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) {
   const userMap = new Map(users.map((u) => [u.id, u] as const));
@@ -36,7 +37,7 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
   });
 
   const aoa: (string | number)[][] = [
-    ["ISSUE LOGGING SYSTEM APS KHADKI"],
+    ["", "ISSUE LOGGING SYSTEM — APS KHADKI"],
     [`Generated: ${new Date().toLocaleString()}  •  Total: ${complaints.length}`],
     [],
     header,
@@ -45,17 +46,39 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Merge title across header columns
+  // Merge title across header columns (skip column A which holds the logo)
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } },
+    { s: { r: 0, c: 1 }, e: { r: 0, c: header.length - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 1 } },
   ];
 
-  // Column widths
+  // Column widths — first col widened slightly to host the logo
   ws["!cols"] = [
-    { wch: 18 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 16 },
+    { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 16 },
     { wch: 28 }, { wch: 50 }, { wch: 22 }, { wch: 22 }, { wch: 10 },
     { wch: 12 }, { wch: 22 }, { wch: 22 },
+  ];
+  // Make row 0 tall enough for the logo
+  ws["!rows"] = [{ hpt: 64 }, { hpt: 18 }];
+
+  // Embed the APSK logo in the top-left cell A1 using sheetjs-style image attach.
+  // xlsx-js-style/SheetJS CE supports !images for embedded pictures.
+  // Strip the data-URI prefix to get the raw base64 payload.
+  const b64 = APSK_LOGO_BASE64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
+  // !images is a community SheetJS extension; safe to attach,
+  // viewers that don't support it will simply ignore the image.
+  (ws as unknown as { ["!images"]: unknown[] })["!images"] = [
+    {
+      name: "apsk-logo.jpeg",
+      data: b64,
+      opts: { base64: true },
+      position: {
+        type: "twoCellAnchor",
+        attrs: { editAs: "oneCell" },
+        from: { col: 0, row: 0, colOff: 50000, rowOff: 50000 },
+        to:   { col: 1, row: 1, colOff: 0,     rowOff: 0     },
+      },
+    },
   ];
 
   const wb = XLSX.utils.book_new();
