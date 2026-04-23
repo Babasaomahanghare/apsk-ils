@@ -338,6 +338,15 @@ export const AdminDashboard = ({ session }: Props) => {
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
                     <SlaBadge complaint={c} />
+                    {c.assignedTo !== "UNASSIGNED" && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${
+                        c.assignedTo === "ATL_LAB"
+                          ? "bg-cyan-100 text-cyan-800 border-cyan-300"
+                          : "bg-amber-100 text-amber-900 border-amber-300"
+                      }`}>
+                        {c.assignedTo === "ATL_LAB" ? "ATL Lab" : "Admin Officer"}
+                      </span>
+                    )}
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}
