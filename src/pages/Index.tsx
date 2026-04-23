@@ -29,14 +29,6 @@ import verifiedBadge from "@/assets/verified-badge.png";
 
 const portals = [
   {
-    role: "student" as Role,
-    title: "Student Portal",
-    description: "Submit and track your issues easily.",
-    icon: Users,
-    gradient: "from-skyblue to-blue-600",
-    button: "Student Login",
-  },
-  {
     role: "teacher" as Role,
     title: "Teacher Portal",
     description: "Manage and resolve student issues.",
@@ -390,7 +382,6 @@ const Index = () => {
               <div>
                 <h3 className="text-gold font-bold text-lg mb-4">Portals</h3>
                 <ul className="space-y-2 text-white/80 text-sm">
-                  <li>Student Portal</li>
                   <li>Teacher Portal</li>
                   <li>Admin Portal</li>
                 </ul>

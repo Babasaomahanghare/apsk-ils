@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardList, Users as UsersIcon, MessageSquare, Check, X, Clock, FileSpreadsheet, Search, FilterX, Trash2, FileText, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +15,27 @@ import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
-import { useComplaints, useUsers } from "@/hooks/useStore";
-import { deleteUser, slaState, updateComplaintStatus, type Session, type StudentUser, type TeacherUser } from "@/lib/store";
+import { useComplaints, useUsers, useActivityLogs } from "@/hooks/useStore";
+import { deleteUser, slaState, updateComplaintStatus, adminScope, ADMIN_ROLE_LABEL,
+  type Session, type StudentUser, type TeacherUser } from "@/lib/store";
 import { exportComplaintsXlsx } from "@/lib/excelExport";
+import { generateSlaReportPdf } from "@/lib/slaReport";
 
 interface Props { session: Session }
 
 export const AdminDashboard = ({ session }: Props) => {
-  const complaintsRaw = useComplaints();
+  // Default to "super" if somehow missing (legacy session) — defensive only.
+  const adminRole = session.adminRole ?? "super";
+  const isSuper = adminRole === "super";
+  const scope = adminScope(adminRole); // null for super
+  const allComplaints = useComplaints();
+  // Scope filter: ATL Lab sees only ATL_LAB; Officer sees only ADMIN_OFFICER; Super sees all.
+  const complaintsRaw = useMemo(
+    () => (scope ? allComplaints.filter((c) => c.assignedTo === scope) : allComplaints),
+    [allComplaints, scope],
+  );
   const users = useUsers();
+  const logs = useActivityLogs();
 
   // Sort: pending+urgent first, then by createdAt desc
   const complaints = useMemo(() => {
@@ -119,13 +131,13 @@ export const AdminDashboard = ({ session }: Props) => {
 
   const act = (id: string, status: "resolved" | "pending" | "rejected") => {
     const response = responseDraft[id]?.trim() || undefined;
-    updateComplaintStatus(id, status, response);
+    updateComplaintStatus(id, status, response, session.name, `admin:${adminRole}`);
     setResponseDraft((d) => ({ ...d, [id]: "" }));
     toast.success(`Marked as ${status}`);
   };
 
   return (
-    <DashboardShell session={session} gradient="from-purple-500 to-indigo-600" roleLabel="Administrator">
+    <DashboardShell session={session} gradient="from-purple-500 to-indigo-600" roleLabel={ADMIN_ROLE_LABEL[adminRole]}>
       {/* Urgent alert banner */}
       {urgentPending.length > 0 && (
         <motion.div
@@ -203,20 +215,41 @@ export const AdminDashboard = ({ session }: Props) => {
                 <span className="text-gray-400 font-normal"> / {complaints.length}</span>
               )})
             </CardTitle>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (filteredComplaints.length === 0) {
-                  toast.error("No complaints to export.");
-                  return;
-                }
-                exportComplaintsXlsx(filteredComplaints, users);
-                toast.success("📊 Excel export downloaded");
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (filteredComplaints.length === 0) {
+                    toast.error("No complaints to export.");
+                    return;
+                  }
+                  exportComplaintsXlsx(filteredComplaints, users);
+                  toast.success("📊 Excel export downloaded");
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
+              </Button>
+              {isSuper && (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    if (filteredComplaints.length === 0) {
+                      toast.error("No complaints to export.");
+                      return;
+                    }
+                    await generateSlaReportPdf(
+                      filteredComplaints,
+                      filtersActive ? "Filtered view" : "All complaints",
+                    );
+                    toast.success("📄 SLA report downloaded");
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-9"
+                >
+                  <FileText className="w-4 h-4 mr-1.5" /> SLA Report (PDF)
+                </Button>
+              )}
+            </div>
           </div>
           {/* Filters */}
           <div className="mt-3 space-y-2">
@@ -305,6 +338,15 @@ export const AdminDashboard = ({ session }: Props) => {
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
                     <SlaBadge complaint={c} />
+                    {c.assignedTo !== "UNASSIGNED" && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${
+                        c.assignedTo === "ATL_LAB"
+                          ? "bg-cyan-100 text-cyan-800 border-cyan-300"
+                          : "bg-amber-100 text-amber-900 border-amber-300"
+                      }`}>
+                        {c.assignedTo === "ATL_LAB" ? "ATL Lab" : "Admin Officer"}
+                      </span>
+                    )}
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}
@@ -350,7 +392,8 @@ export const AdminDashboard = ({ session }: Props) => {
         </CardContent>
       </Card>
 
-      {/* Users panel */}
+      {/* Users panel — Super Admin only */}
+      {isSuper && (
       <Card className="glass-card border-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-navy flex items-center gap-2">
@@ -426,6 +469,10 @@ export const AdminDashboard = ({ session }: Props) => {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* Activity logs — Super Admin only */}
+      {isSuper && <ActivityLogPanel logs={logs} />}
 
       {/* Delete user confirmation */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
@@ -451,5 +498,81 @@ export const AdminDashboard = ({ session }: Props) => {
         </AlertDialogContent>
       </AlertDialog>
     </DashboardShell>
+  );
+};
+
+/* ---------------- Activity Log Panel (Super Admin) ---------------- */
+interface LogPanelProps { logs: ReturnType<typeof useActivityLogs> }
+const ActivityLogPanel = ({ logs }: LogPanelProps) => {
+  const [roleF, setRoleF] = useState<string>("all");
+  const [actionF, setActionF] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => logs.filter((l) => {
+    if (roleF !== "all" && !l.userRole.startsWith(roleF)) return false;
+    if (actionF !== "all" && !l.action.startsWith(actionF)) return false;
+    return true;
+  }), [logs, roleF, actionF]);
+
+  const totalPages = totalPagesOf(filtered.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  useEffect(() => { setPage(1); }, [roleF, actionF]);
+  const paged = paginate(filtered, page);
+
+  return (
+    <Card className="glass-card border-0">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-navy flex items-center gap-2">
+          <Activity className="w-4 h-4 text-indigo-600" /> Activity Logs ({filtered.length}
+          {filtered.length !== logs.length && <span className="text-gray-400 font-normal"> / {logs.length}</span>})
+        </CardTitle>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <Select value={roleF} onValueChange={setRoleF}>
+            <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="admin">Admin (any)</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={actionF} onValueChange={setActionF}>
+            <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All actions</SelectItem>
+              <SelectItem value="auth">Logins</SelectItem>
+              <SelectItem value="complaint">Complaint changes</SelectItem>
+              <SelectItem value="user">User management</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">No activity logged yet.</p>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              {paged.map((l) => (
+                <div key={l.id} className="flex items-start gap-2 text-xs border border-gray-200 rounded-md p-2 bg-white">
+                  <span className="font-mono text-[10px] text-gray-500 shrink-0 w-32">
+                    {new Date(l.createdAt).toLocaleString()}
+                  </span>
+                  <span className="font-semibold text-navy shrink-0">{l.userName}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wide text-indigo-700 shrink-0">
+                    {l.userRole}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wide text-amber-700 shrink-0">
+                    {l.action}
+                  </span>
+                  <span className="text-gray-700 truncate">{l.details}</span>
+                </div>
+              ))}
+            </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 };

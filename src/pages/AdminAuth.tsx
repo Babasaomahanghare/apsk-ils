@@ -13,10 +13,10 @@ const AdminAuth = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const res = loginAdmin(username, password);
+    const res = await loginAdmin(username, password);
     if (res.ok) {
       navigate("/dashboard/admin");
     } else {

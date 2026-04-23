@@ -6,6 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 export type Role = "student" | "teacher" | "admin";
 export type Urgency = "low" | "medium" | "high";
 export type Status = "pending" | "resolved" | "rejected";
+/** Sub-role for admin accounts. Only meaningful when role === "admin". */
+export type AdminRole = "super" | "atl" | "officer";
+/** Department a complaint is auto-routed to. */
+export type AssignedTo = "ATL_LAB" | "ADMIN_OFFICER" | "UNASSIGNED";
 
 export interface StudentUser {
   id: string;
@@ -43,6 +47,10 @@ export interface Complaint {
   deadline: number;        // SLA timestamp
   createdAt: number;
   updatedAt: number;
+  assignedTo: AssignedTo;
+  handledBy?: string;      // username/displayName of admin who closed it
+  handledRole?: string;    // admin sub-role that closed it
+  resolvedAt?: number;     // ms epoch when status moved to resolved/rejected
 }
 
 export interface Feedback {
@@ -77,6 +85,19 @@ export interface Session {
   userId: string;
   role: Role;
   name: string;
+  /** Only set when role === "admin". Determines admin scope. */
+  adminRole?: AdminRole;
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details?: string;
+  complaintId?: string;
+  createdAt: number;
 }
 
 const SESSION_KEY = "apsk.session";
@@ -94,9 +115,16 @@ export const TEACHER_CATEGORIES = {
   ],
 } as const;
 
-export const ADMIN_USERNAME = "APSKADMINS";
-export const ADMIN_PASSWORD = "APSKADMINS19065";
 export const ADMIN_USER_ID = "__admin__";
+/** Friendly label for each admin sub-role. */
+export const ADMIN_ROLE_LABEL: Record<AdminRole, string> = {
+  super: "Principal · Super Admin",
+  atl: "ATL Lab",
+  officer: "Admin Officer",
+};
+/** Department a given admin sub-role can see. `null` = all departments (super). */
+export const adminScope = (r: AdminRole): AssignedTo | null =>
+  r === "atl" ? "ATL_LAB" : r === "officer" ? "ADMIN_OFFICER" : null;
 
 // ---------- SLA ----------
 const SLA_HOURS: Record<Urgency, number> = {
@@ -125,6 +153,9 @@ type ComplaintRow = {
   author_role: "student" | "teacher"; description: string; urgency: Urgency;
   status: Status; category: string | null; subtopic: string | null;
   response: string | null; deadline: string; created_at: string; updated_at: string;
+  assigned_to: AssignedTo;
+  handled_by: string | null; handled_role: string | null;
+  resolved_at: string | null;
 };
 type StudentRow = {
   id: string; name: string; student_class: string; section: string;
@@ -161,6 +192,10 @@ export const mapComplaint = (r: ComplaintRow): Complaint => ({
   deadline: new Date(r.deadline).getTime(),
   createdAt: new Date(r.created_at).getTime(),
   updatedAt: new Date(r.updated_at).getTime(),
+  assignedTo: r.assigned_to ?? "UNASSIGNED",
+  handledBy: r.handled_by ?? undefined,
+  handledRole: r.handled_role ?? undefined,
+  resolvedAt: r.resolved_at ? new Date(r.resolved_at).getTime() : undefined,
 });
 export const mapStudent = (r: StudentRow): StudentUser => ({
   id: r.id, role: "student", name: r.name, studentClass: r.student_class,
@@ -316,17 +351,26 @@ export const loginTeacher = async (email: string, password: string) => {
   return { ok: true as const, user };
 };
 
-export const loginAdmin = (username: string, password: string) => {
-  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-    return { ok: false as const, error: "Invalid admin credentials." };
-  }
-  setSession({ userId: ADMIN_USER_ID, role: "admin", name: "Admin" });
-  return { ok: true as const };
+export const loginAdmin = async (username: string, password: string) => {
+  const { data } = await supabase.from("admin_users")
+    .select("*").eq("username", username).maybeSingle();
+  if (!data) return { ok: false as const, error: "Invalid admin credentials." };
+  const row = data as { id: string; username: string; password_hash: string; admin_role: AdminRole; display_name: string };
+  const { data: ok } = await supabase.rpc("verify_password", {
+    _password: password, _hash: row.password_hash,
+  });
+  if (!ok) return { ok: false as const, error: "Invalid admin credentials." };
+  setSession({ userId: ADMIN_USER_ID, role: "admin", name: row.display_name, adminRole: row.admin_role });
+  await logAction({
+    userId: row.username, userName: row.display_name, userRole: `admin:${row.admin_role}`,
+    action: "auth.login", details: `Admin login (${row.admin_role})`,
+  });
+  return { ok: true as const, adminRole: row.admin_role, name: row.display_name };
 };
 
 // ---------- mutations ----------
 export const addComplaint = async (
-  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline">,
+  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline" | "assignedTo" | "handledBy" | "handledRole" | "resolvedAt">,
 ): Promise<Complaint | null> => {
   const { data: ticketId, error: tErr } = await supabase.rpc("next_ticket_id");
   if (tErr || !ticketId) { console.error(tErr); return null; }
@@ -346,14 +390,27 @@ export const addComplaint = async (
     title: c.urgency === "high" ? "🚨 URGENT complaint received" : "New complaint received",
     message: `${complaint.ticketId} — ${c.authorName} (${c.authorRole})`,
   });
+  await logAction({
+    userId: c.authorId, userName: c.authorName, userRole: c.authorRole,
+    action: "complaint.create",
+    details: `${complaint.ticketId} routed → ${complaint.assignedTo}`,
+    complaintId: complaint.id,
+  });
   return complaint;
 };
 
 export const updateComplaintStatus = async (
-  id: string, status: Status, response?: string,
+  id: string, status: Status, response?: string, handledBy?: string, handledRole?: string,
 ) => {
-  const patch: { status: Status; response?: string } =
-    response !== undefined ? { status, response } : { status };
+  const patch: { status: Status; response?: string; handled_by?: string | null; handled_role?: string | null } = { status };
+  if (response !== undefined) patch.response = response;
+  if (status === "pending") {
+    patch.handled_by = null;
+    patch.handled_role = null;
+  } else {
+    if (handledBy) patch.handled_by = handledBy;
+    if (handledRole) patch.handled_role = handledRole;
+  }
   const { data, error } = await supabase.from("complaints")
     .update(patch).eq("id", id).select("*").single();
   if (error || !data) { console.error(error); return; }
@@ -362,6 +419,14 @@ export const updateComplaintStatus = async (
     userId: c.authorId,
     title: `${c.ticketId} ${status}`,
     message: response ? `Admin: ${response}` : `Status updated to "${status}".`,
+  });
+  await logAction({
+    userId: handledBy ?? ADMIN_USER_ID,
+    userName: handledBy ?? "Admin",
+    userRole: handledRole ?? "admin",
+    action: `complaint.${status}`,
+    details: `${c.ticketId} → ${status}${response ? `: ${response.slice(0, 80)}` : ""}`,
+    complaintId: c.id,
   });
 };
 
@@ -382,6 +447,32 @@ export const pushNotification = async (
   await supabase.from("notifications").insert({
     user_id: n.userId, title: n.title, message: n.message, read: false,
   });
+};
+
+// ---------- activity logs ----------
+type ActivityLogRow = {
+  id: string; user_id: string; user_name: string; user_role: string;
+  action: string; details: string | null; complaint_id: string | null; created_at: string;
+};
+const mapLog = (r: ActivityLogRow): ActivityLog => ({
+  id: r.id, userId: r.user_id, userName: r.user_name, userRole: r.user_role,
+  action: r.action, details: r.details ?? undefined,
+  complaintId: r.complaint_id ?? undefined,
+  createdAt: new Date(r.created_at).getTime(),
+});
+export const logAction = async (
+  l: Omit<ActivityLog, "id" | "createdAt">,
+): Promise<void> => {
+  await supabase.from("activity_logs").insert({
+    user_id: l.userId, user_name: l.userName, user_role: l.userRole,
+    action: l.action, details: l.details ?? null, complaint_id: l.complaintId ?? null,
+  });
+};
+export const fetchActivityLogs = async (limit = 500): Promise<ActivityLog[]> => {
+  const { data, error } = await supabase.from("activity_logs")
+    .select("*").order("created_at", { ascending: false }).limit(limit);
+  if (error) { console.error(error); return []; }
+  return (data as ActivityLogRow[]).map(mapLog);
 };
 
 export const markNotificationsRead = async (userId: string) => {
@@ -405,8 +496,14 @@ export const deleteUser = async (
   await supabase.from("feedback").delete().eq("author_id", userId);
   // Finally delete the user record
   const table = role === "student" ? "students" : "teachers";
+  const { data: u } = await supabase.from(table).select("name").eq("id", userId).maybeSingle();
   const { error } = await supabase.from(table).delete().eq("id", userId);
   if (error) return { ok: false, error: error.message };
+  await logAction({
+    userId: ADMIN_USER_ID, userName: "Admin", userRole: "admin",
+    action: "user.delete",
+    details: `Removed ${role} ${(u as { name?: string } | null)?.name ?? userId}`,
+  });
   return { ok: true };
 };
 

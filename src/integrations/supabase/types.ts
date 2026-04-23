@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          complaint_id: string | null
+          created_at: string
+          details: string | null
+          id: string
+          user_id: string
+          user_name: string
+          user_role: string
+        }
+        Insert: {
+          action: string
+          complaint_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          user_id: string
+          user_name: string
+          user_role: string
+        }
+        Update: {
+          action?: string
+          complaint_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          user_id?: string
+          user_name?: string
+          user_role?: string
+        }
+        Relationships: []
+      }
+      admin_users: {
+        Row: {
+          admin_role: string
+          created_at: string
+          display_name: string
+          id: string
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          admin_role: string
+          created_at?: string
+          display_name: string
+          id?: string
+          password_hash: string
+          username: string
+        }
+        Update: {
+          admin_role?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
+      }
       complaint_comments: {
         Row: {
           author_id: string
@@ -54,6 +114,7 @@ export type Database = {
       }
       complaints: {
         Row: {
+          assigned_to: string
           author_id: string
           author_name: string
           author_role: string
@@ -61,7 +122,10 @@ export type Database = {
           created_at: string
           deadline: string
           description: string
+          handled_by: string | null
+          handled_role: string | null
           id: string
+          resolved_at: string | null
           response: string | null
           status: string
           subtopic: string | null
@@ -70,6 +134,7 @@ export type Database = {
           urgency: string
         }
         Insert: {
+          assigned_to?: string
           author_id: string
           author_name: string
           author_role: string
@@ -77,7 +142,10 @@ export type Database = {
           created_at?: string
           deadline: string
           description: string
+          handled_by?: string | null
+          handled_role?: string | null
           id?: string
+          resolved_at?: string | null
           response?: string | null
           status?: string
           subtopic?: string | null
@@ -86,6 +154,7 @@ export type Database = {
           urgency: string
         }
         Update: {
+          assigned_to?: string
           author_id?: string
           author_name?: string
           author_role?: string
@@ -93,7 +162,10 @@ export type Database = {
           created_at?: string
           deadline?: string
           description?: string
+          handled_by?: string | null
+          handled_role?: string | null
           id?: string
+          resolved_at?: string | null
           response?: string | null
           status?: string
           subtopic?: string | null
