@@ -215,20 +215,41 @@ export const AdminDashboard = ({ session }: Props) => {
                 <span className="text-gray-400 font-normal"> / {complaints.length}</span>
               )})
             </CardTitle>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (filteredComplaints.length === 0) {
-                  toast.error("No complaints to export.");
-                  return;
-                }
-                exportComplaintsXlsx(filteredComplaints, users);
-                toast.success("📊 Excel export downloaded");
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (filteredComplaints.length === 0) {
+                    toast.error("No complaints to export.");
+                    return;
+                  }
+                  exportComplaintsXlsx(filteredComplaints, users);
+                  toast.success("📊 Excel export downloaded");
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export to Excel
+              </Button>
+              {isSuper && (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    if (filteredComplaints.length === 0) {
+                      toast.error("No complaints to export.");
+                      return;
+                    }
+                    await generateSlaReportPdf(
+                      filteredComplaints,
+                      filtersActive ? "Filtered view" : "All complaints",
+                    );
+                    toast.success("📄 SLA report downloaded");
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-9"
+                >
+                  <FileText className="w-4 h-4 mr-1.5" /> SLA Report (PDF)
+                </Button>
+              )}
+            </div>
           </div>
           {/* Filters */}
           <div className="mt-3 space-y-2">
