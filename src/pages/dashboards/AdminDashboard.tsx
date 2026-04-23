@@ -15,6 +15,7 @@ import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
+import { ApprovedTeachersPanel } from "@/components/dashboard/ApprovedTeachersPanel";
 import { useComplaints, useUsers, useActivityLogs } from "@/hooks/useStore";
 import { deleteUser, slaState, updateComplaintStatus, adminScope, ADMIN_ROLE_LABEL,
   type Session, type StudentUser, type TeacherUser } from "@/lib/store";
@@ -473,6 +474,9 @@ export const AdminDashboard = ({ session }: Props) => {
 
       {/* Activity logs — Super Admin only */}
       {isSuper && <ActivityLogPanel logs={logs} />}
+
+      {/* Teacher email whitelist — Super Admin only */}
+      {isSuper && <ApprovedTeachersPanel />}
 
       {/* Delete user confirmation */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>

@@ -65,9 +65,9 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
   // xlsx-js-style/SheetJS CE supports !images for embedded pictures.
   // Strip the data-URI prefix to get the raw base64 payload.
   const b64 = APSK_LOGO_BASE64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
-  // @ts-expect-error — !images is a community SheetJS extension; safe to attach,
+  // !images is a community SheetJS extension; safe to attach,
   // viewers that don't support it will simply ignore the image.
-  ws["!images"] = [
+  (ws as unknown as { ["!images"]: unknown[] })["!images"] = [
     {
       name: "apsk-logo.jpeg",
       data: b64,
