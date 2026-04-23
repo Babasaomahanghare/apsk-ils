@@ -392,7 +392,8 @@ export const AdminDashboard = ({ session }: Props) => {
         </CardContent>
       </Card>
 
-      {/* Users panel */}
+      {/* Users panel — Super Admin only */}
+      {isSuper && (
       <Card className="glass-card border-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-navy flex items-center gap-2">
@@ -468,6 +469,10 @@ export const AdminDashboard = ({ session }: Props) => {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* Activity logs — Super Admin only */}
+      {isSuper && <ActivityLogPanel logs={logs} />}
 
       {/* Delete user confirmation */}
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
