@@ -351,12 +351,21 @@ export const loginTeacher = async (email: string, password: string) => {
   return { ok: true as const, user };
 };
 
-export const loginAdmin = (username: string, password: string) => {
-  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-    return { ok: false as const, error: "Invalid admin credentials." };
-  }
-  setSession({ userId: ADMIN_USER_ID, role: "admin", name: "Admin" });
-  return { ok: true as const };
+export const loginAdmin = async (username: string, password: string) => {
+  const { data } = await supabase.from("admin_users")
+    .select("*").eq("username", username).maybeSingle();
+  if (!data) return { ok: false as const, error: "Invalid admin credentials." };
+  const row = data as { id: string; username: string; password_hash: string; admin_role: AdminRole; display_name: string };
+  const { data: ok } = await supabase.rpc("verify_password", {
+    _password: password, _hash: row.password_hash,
+  });
+  if (!ok) return { ok: false as const, error: "Invalid admin credentials." };
+  setSession({ userId: ADMIN_USER_ID, role: "admin", name: row.display_name, adminRole: row.admin_role });
+  await logAction({
+    userId: row.username, userName: row.display_name, userRole: `admin:${row.admin_role}`,
+    action: "auth.login", details: `Admin login (${row.admin_role})`,
+  });
+  return { ok: true as const, adminRole: row.admin_role, name: row.display_name };
 };
 
 // ---------- mutations ----------
