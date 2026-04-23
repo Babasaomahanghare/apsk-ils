@@ -443,6 +443,32 @@ export const pushNotification = async (
   });
 };
 
+// ---------- activity logs ----------
+type ActivityLogRow = {
+  id: string; user_id: string; user_name: string; user_role: string;
+  action: string; details: string | null; complaint_id: string | null; created_at: string;
+};
+const mapLog = (r: ActivityLogRow): ActivityLog => ({
+  id: r.id, userId: r.user_id, userName: r.user_name, userRole: r.user_role,
+  action: r.action, details: r.details ?? undefined,
+  complaintId: r.complaint_id ?? undefined,
+  createdAt: new Date(r.created_at).getTime(),
+});
+export const logAction = async (
+  l: Omit<ActivityLog, "id" | "createdAt">,
+): Promise<void> => {
+  await supabase.from("activity_logs").insert({
+    user_id: l.userId, user_name: l.userName, user_role: l.userRole,
+    action: l.action, details: l.details ?? null, complaint_id: l.complaintId ?? null,
+  });
+};
+export const fetchActivityLogs = async (limit = 500): Promise<ActivityLog[]> => {
+  const { data, error } = await supabase.from("activity_logs")
+    .select("*").order("created_at", { ascending: false }).limit(limit);
+  if (error) { console.error(error); return []; }
+  return (data as ActivityLogRow[]).map(mapLog);
+};
+
 export const markNotificationsRead = async (userId: string) => {
   await supabase.from("notifications").update({ read: true })
     .eq("user_id", userId).eq("read", false);
