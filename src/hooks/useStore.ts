@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchComplaints, fetchFeedback, fetchNotifications, fetchUsers,
-  fetchComments, getSession,
+  fetchComments, fetchActivityLogs, getSession,
   type Complaint, type Feedback, type Notification, type Session, type AppUser,
-  type Comment,
+  type Comment, type ActivityLog,
 } from "@/lib/store";
 
 // Session — cached in localStorage; updates via custom event
@@ -45,6 +45,7 @@ function useRealtime<T>(
 export const useComplaints = (): Complaint[] => useRealtime<Complaint>(fetchComplaints, "complaints");
 export const useFeedback = (): Feedback[] => useRealtime<Feedback>(fetchFeedback, "feedback");
 export const useNotifications = (): Notification[] => useRealtime<Notification>(fetchNotifications, "notifications");
+export const useActivityLogs = (): ActivityLog[] => useRealtime<ActivityLog>(() => fetchActivityLogs(500), "activity_logs");
 
 // Users = students + teachers; refresh on either table change
 export const useUsers = (): AppUser[] => {
