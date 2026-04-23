@@ -6,6 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 export type Role = "student" | "teacher" | "admin";
 export type Urgency = "low" | "medium" | "high";
 export type Status = "pending" | "resolved" | "rejected";
+/** Sub-role for admin accounts. Only meaningful when role === "admin". */
+export type AdminRole = "super" | "atl" | "officer";
+/** Department a complaint is auto-routed to. */
+export type AssignedTo = "ATL_LAB" | "ADMIN_OFFICER" | "UNASSIGNED";
 
 export interface StudentUser {
   id: string;
@@ -43,6 +47,10 @@ export interface Complaint {
   deadline: number;        // SLA timestamp
   createdAt: number;
   updatedAt: number;
+  assignedTo: AssignedTo;
+  handledBy?: string;      // username/displayName of admin who closed it
+  handledRole?: string;    // admin sub-role that closed it
+  resolvedAt?: number;     // ms epoch when status moved to resolved/rejected
 }
 
 export interface Feedback {
@@ -77,6 +85,19 @@ export interface Session {
   userId: string;
   role: Role;
   name: string;
+  /** Only set when role === "admin". Determines admin scope. */
+  adminRole?: AdminRole;
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details?: string;
+  complaintId?: string;
+  createdAt: number;
 }
 
 const SESSION_KEY = "apsk.session";
@@ -94,9 +115,16 @@ export const TEACHER_CATEGORIES = {
   ],
 } as const;
 
-export const ADMIN_USERNAME = "APSKADMINS";
-export const ADMIN_PASSWORD = "APSKADMINS19065";
 export const ADMIN_USER_ID = "__admin__";
+/** Friendly label for each admin sub-role. */
+export const ADMIN_ROLE_LABEL: Record<AdminRole, string> = {
+  super: "Principal · Super Admin",
+  atl: "ATL Lab",
+  officer: "Admin Officer",
+};
+/** Department a given admin sub-role can see. `null` = all departments (super). */
+export const adminScope = (r: AdminRole): AssignedTo | null =>
+  r === "atl" ? "ATL_LAB" : r === "officer" ? "ADMIN_OFFICER" : null;
 
 // ---------- SLA ----------
 const SLA_HOURS: Record<Urgency, number> = {
