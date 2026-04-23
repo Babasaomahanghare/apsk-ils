@@ -390,6 +390,12 @@ export const addComplaint = async (
     title: c.urgency === "high" ? "🚨 URGENT complaint received" : "New complaint received",
     message: `${complaint.ticketId} — ${c.authorName} (${c.authorRole})`,
   });
+  await logAction({
+    userId: c.authorId, userName: c.authorName, userRole: c.authorRole,
+    action: "complaint.create",
+    details: `${complaint.ticketId} routed → ${complaint.assignedTo}`,
+    complaintId: complaint.id,
+  });
   return complaint;
 };
 
@@ -490,8 +496,14 @@ export const deleteUser = async (
   await supabase.from("feedback").delete().eq("author_id", userId);
   // Finally delete the user record
   const table = role === "student" ? "students" : "teachers";
+  const { data: u } = await supabase.from(table).select("name").eq("id", userId).maybeSingle();
   const { error } = await supabase.from(table).delete().eq("id", userId);
   if (error) return { ok: false, error: error.message };
+  await logAction({
+    userId: ADMIN_USER_ID, userName: "Admin", userRole: "admin",
+    action: "user.delete",
+    details: `Removed ${role} ${(u as { name?: string } | null)?.name ?? userId}`,
+  });
   return { ok: true };
 };
 
