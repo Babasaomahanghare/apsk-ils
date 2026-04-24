@@ -9,6 +9,7 @@ import campusHero from "@/assets/campus-hero.jpg";
 import { findComplaintByTicket, type Complaint } from "@/lib/store";
 import { StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
 import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
+import { PhotoAttachments } from "@/components/dashboard/PhotoLightbox";
 
 const TrackComplaint = () => {
   const [params, setParams] = useSearchParams();
@@ -108,6 +109,15 @@ const TrackComplaint = () => {
                     <p className="text-gray-500 text-xs uppercase font-bold">Description</p>
                     <p className="text-gray-700 whitespace-pre-wrap">{result.description}</p>
                   </div>
+
+                  {result.attachments && result.attachments.length > 0 && (
+                    <div className="text-sm">
+                      <p className="text-gray-500 text-xs uppercase font-bold mb-1">
+                        Attachments ({result.attachments.length})
+                      </p>
+                      <PhotoAttachments urls={result.attachments} ticketId={result.ticketId} />
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-gray-500 text-xs uppercase font-bold mb-2">Timeline</p>

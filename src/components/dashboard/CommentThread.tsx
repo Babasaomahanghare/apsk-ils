@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useComments } from "@/hooks/useStore";
 import { addComment, type Session } from "@/lib/store";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 
 interface Props {
   complaintId: string;
@@ -17,6 +18,13 @@ export const CommentThread = ({ complaintId, session }: Props) => {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(comments.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  // Show newest page automatically when a new comment arrives.
+  const lastCount = useMemo(() => comments.length, [comments.length]);
+  useEffect(() => { setPage(totalPages); }, [lastCount, totalPages]);
+  const paged = paginate(comments, page);
 
   const send = async () => {
     const msg = draft.trim();
@@ -72,7 +80,7 @@ export const CommentThread = ({ complaintId, session }: Props) => {
                   No messages yet. Start the conversation.
                 </p>
               ) : (
-                comments.map((c) => (
+                paged.map((c) => (
                   <div
                     key={c.id}
                     className={`text-xs rounded-md border p-2 ${roleColor(c.authorRole)}`}
@@ -90,6 +98,7 @@ export const CommentThread = ({ complaintId, session }: Props) => {
                 ))
               )}
             </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
             <div className="mt-2 flex gap-2">
               <Textarea
                 value={draft}

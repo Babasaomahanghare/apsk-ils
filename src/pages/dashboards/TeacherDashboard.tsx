@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, ClipboardList, MessageSquare, Download } from "lucide-react";
+import { Send, ClipboardList, MessageSquare, Download, Paperclip, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
+import { PhotoAttachments, AttachmentBadge } from "@/components/dashboard/PhotoLightbox";
 import { useComplaints } from "@/hooks/useStore";
 import {
   addComplaint,
@@ -65,7 +66,39 @@ export const TeacherDashboard = ({ session }: Props) => {
   const [subtopic, setSubtopic] = useState("");
   const [desc, setDesc] = useState("");
   const [urgency, setUrgency] = useState<Urgency>("low");
+  const [photos, setPhotos] = useState<File[]>([]);
   const descWords = wordCount(desc);
+
+  const MAX_PHOTOS = 4;
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+
+  const onPickFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+    const valid: File[] = [];
+    for (const f of picked) {
+      if (!ACCEPTED.includes(f.type)) {
+        toast.error(`${f.name}: only JPG, PNG or WEBP allowed.`);
+        continue;
+      }
+      if (f.size > MAX_BYTES) {
+        toast.error(`${f.name}: exceeds 5 MB limit.`);
+        continue;
+      }
+      valid.push(f);
+    }
+    setPhotos((prev) => {
+      const next = [...prev, ...valid].slice(0, MAX_PHOTOS);
+      if (prev.length + valid.length > MAX_PHOTOS) {
+        toast.error(`Maximum ${MAX_PHOTOS} photos per complaint.`);
+      }
+      return next;
+    });
+  };
+  const removePhoto = (i: number) =>
+    setPhotos((p) => p.filter((_, idx) => idx !== i));
 
   const submit = async () => {
     if (!category) return toast.error("Select a category.");
@@ -82,7 +115,7 @@ export const TeacherDashboard = ({ session }: Props) => {
       urgency,
       category,
       subtopic,
-    });
+    }, photos);
     if (!complaint) {
       toast.error("Submission failed");
       return;
@@ -91,6 +124,7 @@ export const TeacherDashboard = ({ session }: Props) => {
     setSubtopic("");
     setDesc("");
     setUrgency("low");
+    setPhotos([]);
     toast.success(`✅ Submitted — ${complaint.ticketId}`, {
       description: "Your PDF receipt is downloading...",
     });
@@ -205,6 +239,47 @@ export const TeacherDashboard = ({ session }: Props) => {
               ))}
             </div>
           </div>
+          <div>
+            <Label className="text-xs font-semibold text-navy flex items-center gap-1.5">
+              <Paperclip className="w-3.5 h-3.5" /> Photos (optional)
+            </Label>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Up to {MAX_PHOTOS} images, max 5 MB each. JPG, PNG or WEBP.
+            </p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={onPickFiles}
+              disabled={photos.length >= MAX_PHOTOS}
+              className="mt-2 block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 disabled:opacity-50"
+            />
+            {photos.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {photos.map((f, i) => {
+                  const url = URL.createObjectURL(f);
+                  return (
+                    <div key={`${f.name}-${i}`} className="relative w-16 h-16 rounded-md overflow-hidden border border-gray-200 bg-white">
+                      <img
+                        src={url}
+                        alt={f.name}
+                        className="w-full h-full object-cover"
+                        onLoad={() => URL.revokeObjectURL(url)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute top-0.5 right-0.5 bg-black/70 hover:bg-black text-white rounded-full p-0.5"
+                        aria-label={`Remove ${f.name}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <Button
             onClick={submit}
             className="w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white font-semibold"
@@ -242,6 +317,7 @@ export const TeacherDashboard = ({ session }: Props) => {
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
                     <SlaBadge complaint={c} />
+                    <AttachmentBadge count={c.attachments?.length ?? 0} />
                     {c.category && (
                       <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
                         {c.category} → {c.subtopic}
@@ -252,6 +328,7 @@ export const TeacherDashboard = ({ session }: Props) => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.description}</p>
+                  <PhotoAttachments urls={c.attachments ?? []} ticketId={c.ticketId} />
                   {c.response && (
                     <div className="mt-2 flex items-start gap-2 text-xs bg-blue-50 border border-blue-200 rounded-md p-2">
                       <MessageSquare className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
