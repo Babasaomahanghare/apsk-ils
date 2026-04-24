@@ -442,7 +442,8 @@ export const loginAdmin = async (username: string, password: string) => {
 
 // ---------- mutations ----------
 export const addComplaint = async (
-  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline" | "assignedTo" | "handledBy" | "handledRole" | "resolvedAt">,
+  c: Omit<Complaint, "id" | "ticketId" | "createdAt" | "updatedAt" | "status" | "deadline" | "assignedTo" | "handledBy" | "handledRole" | "resolvedAt" | "attachments">,
+  files: File[] = [],
 ): Promise<Complaint | null> => {
   const { data: ticketId, error: tErr } = await supabase.rpc("next_ticket_id");
   if (tErr || !ticketId) { console.error(tErr); return null; }
@@ -456,7 +457,28 @@ export const addComplaint = async (
     deadline,
   }).select("*").single();
   if (error || !data) { console.error(error); return null; }
-  const complaint = mapComplaint(data as ComplaintRow);
+  let complaint = mapComplaint(data as ComplaintRow);
+
+  // Upload attachments (best-effort; failures don't block complaint creation).
+  if (files.length > 0) {
+    const urls: string[] = [];
+    for (const f of files) {
+      const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${complaint.ticketId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("complaint-photos")
+        .upload(path, f, { contentType: f.type, upsert: false });
+      if (upErr) { console.warn("photo upload failed", upErr); continue; }
+      const { data: pub } = supabase.storage.from("complaint-photos").getPublicUrl(path);
+      if (pub?.publicUrl) urls.push(pub.publicUrl);
+    }
+    if (urls.length > 0) {
+      const { data: updated } = await supabase.from("complaints")
+        .update({ attachments: urls }).eq("id", complaint.id).select("*").single();
+      if (updated) complaint = mapComplaint(updated as ComplaintRow);
+    }
+  }
+
   await pushNotification({
     userId: ADMIN_USER_ID,
     title: c.urgency === "high" ? "🚨 URGENT complaint received" : "New complaint received",
