@@ -16,6 +16,7 @@ import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 import { ApprovedTeachersPanel } from "@/components/dashboard/ApprovedTeachersPanel";
+import { PhotoAttachments, AttachmentBadge } from "@/components/dashboard/PhotoLightbox";
 import { useComplaints, useUsers, useActivityLogs } from "@/hooks/useStore";
 import { deleteUser, slaState, updateComplaintStatus, adminScope, ADMIN_ROLE_LABEL,
   type Session, type StudentUser, type TeacherUser } from "@/lib/store";
@@ -339,6 +340,7 @@ export const AdminDashboard = ({ session }: Props) => {
                     <UrgencyBadge urgency={c.urgency} />
                     <StatusBadge status={c.status} />
                     <SlaBadge complaint={c} />
+                    <AttachmentBadge count={c.attachments?.length ?? 0} />
                     {c.assignedTo !== "UNASSIGNED" && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${
                         c.assignedTo === "ATL_LAB"
@@ -358,6 +360,7 @@ export const AdminDashboard = ({ session }: Props) => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.description}</p>
+                  <PhotoAttachments urls={c.attachments ?? []} ticketId={c.ticketId} />
                   {c.response && (
                     <div className="mt-2 flex items-start gap-2 text-xs bg-blue-50 border border-blue-200 rounded-md p-2">
                       <MessageSquare className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
