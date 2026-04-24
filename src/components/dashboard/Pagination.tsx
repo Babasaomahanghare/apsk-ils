@@ -38,7 +38,7 @@ export const Pagination = ({ page, totalPages, onChange }: Props) => {
   );
 };
 
-export const PAGE_SIZE = 6;
+export const PAGE_SIZE = 7;
 
 export const paginate = <T,>(items: T[], page: number, pageSize = PAGE_SIZE): T[] => {
   const start = (page - 1) * pageSize;

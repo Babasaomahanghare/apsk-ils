@@ -51,6 +51,8 @@ export interface Complaint {
   handledBy?: string;      // username/displayName of admin who closed it
   handledRole?: string;    // admin sub-role that closed it
   resolvedAt?: number;     // ms epoch when status moved to resolved/rejected
+  /** Public URLs of photos attached to this complaint. */
+  attachments: string[];
 }
 
 export interface Feedback {
