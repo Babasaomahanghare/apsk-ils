@@ -1,39 +1,75 @@
 
-## Migrate APSK ILS to Lovable Cloud (permanent DB + realtime)
 
-Move all data off `localStorage` into a real Postgres database with row-level security and realtime updates. Login UX stays the same (admission # for students, email for teachers, fixed admin credentials).
+## Plan: Photo attachments + 7-per-page pagination everywhere
 
-### 1. Enable Lovable Cloud
-Provisions Postgres + Auth + Realtime + Edge Functions.
+### 1. Photo attachments on complaints
 
-### 2. Database schema (migration)
+**Database (migration)**
+- Create storage bucket `complaint-photos` (public read, authenticated write).
+- Add `attachments text[]` column to `complaints` table (array of storage paths, default `'{}'`).
+- RLS on `storage.objects` for `complaint-photos`: anyone can read, anyone can insert (matches current open-policy app model).
 
-- **`students`** — id (uuid pk), name, student_class, section, admission (unique), phone, email (unique), password_hash, created_at
-- **`teachers`** — id, name, phone, email (unique), password_hash, created_at
-- **`complaints`** — id, ticket_id (unique, e.g. `TKT-APS-2026-0001`), author_id, author_name, author_role (`student`|`teacher`), description, urgency, status, category, subtopic, response, deadline, created_at, updated_at
-- **`feedback`** — id, author_id, author_name, text, rating, created_at
-- **`notifications`** — id, user_id (text — supports `__admin__`), title, message, read, created_at
-- **`ticket_counter`** — year (pk), seq — atomic ticket numbering via `next_ticket_id()` RPC
+**Backend (`src/lib/store.ts`)**
+- Extend `Complaint` type with `attachments: string[]`.
+- Update `fetchComplaints` to map the new column.
+- Update `createComplaint` to accept `files: File[]`, upload each to `complaint-photos/{ticketId}/{uuid}.{ext}` via `supabase.storage`, then save the resulting public URLs into `complaints.attachments`.
+- Add helper `getPhotoPublicUrl(path)` for rendering.
 
-**Security**: Custom credential auth (per your choice). Passwords hashed with bcrypt via pgcrypto. RLS enabled with permissive policies — app trusts its own session, just like today. Admin gate stays the hardcoded `APSKADMINS` credentials client-side.
+**Teacher portal (`src/pages/dashboards/TeacherDashboard.tsx`)**
+- Add a file input to the New Complaint form: "Attach photos (optional, max 4, 5MB each, JPG/PNG/WEBP)".
+- Client-side validation: count, size, mime type.
+- Show inline thumbnail previews before submit.
 
-### 3. Data layer rewrite (`src/lib/store.ts` → `src/lib/db/*`)
-Replace every localStorage call with Supabase queries. Session (`{userId, role, name}`) still cached in localStorage. Ticket IDs generated server-side (race-safe).
+**Complaint card (used in Admin + Teacher dashboards)**
+- Render attached photos as a thumbnail row below the description. Click → open full-size in a `Dialog` lightbox.
+- Show "📎 N" badge on the card header when attachments exist.
 
-### 4. Realtime hooks
-Supabase Realtime `postgres_changes` channels: live complaints list, live charts, slide-down notifications, live feedback panel.
+**SLA PDF report (`src/lib/slaReport.ts`)**
+- Add an "Attachments" column (count only, e.g. "2 photos") — keeps the table compact. No image embedding in PDF (would balloon file size).
 
-### 5. Wire up existing pages (no UI redesign)
-Auth pages, all 3 dashboards, TrackComplaint, PDF + Excel export — all consume new async data layer with loading skeletons.
+### 2. Pagination — 7 items per page across the app
 
-### 6. Seed
-Just `ticket_counter` for current year. No mock data — fresh start.
+Create a single shared hook `src/hooks/usePagination.ts`:
+```ts
+usePagination<T>(items: T[], pageSize = 7)
+  → { page, setPage, totalPages, pageItems, reset }
+```
 
-### What stays the same
-All UI, dashboards, charts, animations, ticketing, SLA, PDF, Excel, design, login UX.
+Apply to every list view. The existing `Pagination` component (`src/components/dashboard/Pagination.tsx`) is already in use — reuse it everywhere with `pageSize=7`:
 
-### What changes
-True cross-device permanence, true multi-user realtime (admin sees a complaint the instant a student submits on another device), live charts.
+| Location | List being paginated |
+|---|---|
+| `AdminDashboard.tsx` | Complaints list (currently shows top 6 — change to 7) |
+| `AdminDashboard.tsx` | Activity Logs panel |
+| `AdminDashboard.tsx` | Approved Teachers panel |
+| `AdminDashboard.tsx` | Feedback list |
+| `AdminDashboard.tsx` | Users (teachers) list |
+| `TeacherDashboard.tsx` | "My complaints" list |
+| `TeacherDashboard.tsx` | Notifications list |
+| `TrackComplaint.tsx` | Comment thread (if >7) |
 
-### Risks
-Custom-password DB auth is weaker than Supabase Auth even with bcrypt — you accepted the trade-off. All existing localStorage data is lost (you confirmed). First load slightly slower (mitigated with skeletons).
+Pagination resets to page 1 whenever filters/search change. Page controls hidden when `totalPages <= 1`.
+
+### Technical details
+
+- **Storage path**: `complaint-photos/{ticket_id}/{random-uuid}.{ext}` — keeps assets grouped per complaint and easy to clean up later.
+- **Upload flow**: create complaint row → get `ticket_id` back → upload files → `update` row with `attachments` array. Wrapped so a failed upload doesn't block complaint creation (complaint saves, photos retried/skipped with a toast).
+- **Realtime**: existing `useComplaints` already subscribes to `postgres_changes`; the new `attachments` column flows through automatically.
+- **No UI redesign**: thumbnails reuse existing `Card` / `Dialog` / `Badge` components and current spacing.
+- **Pagination UX**: identical look to existing `Pagination` component (Prev / 1 2 3 / Next), placed at the bottom of each list section.
+
+### Files
+
+**Created**
+- `supabase/migrations/<ts>_complaint_attachments.sql`
+- `src/hooks/usePagination.ts`
+- `src/components/dashboard/PhotoLightbox.tsx`
+
+**Updated**
+- `src/lib/store.ts` (type + create/fetch logic + upload helper)
+- `src/lib/slaReport.ts` (attachments count column)
+- `src/pages/dashboards/TeacherDashboard.tsx` (file input, previews, my-complaints pagination, notifications pagination)
+- `src/pages/dashboards/AdminDashboard.tsx` (7-per-page on all lists, photo thumbnails on cards)
+- `src/components/dashboard/ApprovedTeachersPanel.tsx` (pagination)
+- `src/pages/TrackComplaint.tsx` (show attachments + paginate comments)
+
