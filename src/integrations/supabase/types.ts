@@ -133,6 +133,7 @@ export type Database = {
       complaints: {
         Row: {
           assigned_to: string
+          attachments: string[]
           author_id: string
           author_name: string
           author_role: string
@@ -153,6 +154,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string
+          attachments?: string[]
           author_id: string
           author_name: string
           author_role: string
@@ -173,6 +175,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string
+          attachments?: string[]
           author_id?: string
           author_name?: string
           author_role?: string
