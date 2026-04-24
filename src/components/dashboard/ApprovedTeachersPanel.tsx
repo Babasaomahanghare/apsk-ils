@@ -9,12 +9,17 @@ import {
   type ApprovedTeacher,
 } from "@/lib/store";
 import { toast } from "sonner";
+import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
 
 /** Super Admin–only panel to manage the teacher email whitelist. */
 export const ApprovedTeachersPanel = () => {
   const [list, setList] = useState<ApprovedTeacher[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const totalPages = totalPagesOf(list.length);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  const paged = paginate(list, page);
 
   const refresh = () => {
     fetchApprovedTeachers().then(setList);
@@ -88,8 +93,9 @@ export const ApprovedTeachersPanel = () => {
         {list.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">No approved emails yet.</p>
         ) : (
-          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-            {list.map((a) => (
+          <>
+          <div className="space-y-1.5">
+            {paged.map((a) => (
               <div
                 key={a.id}
                 className="flex items-center justify-between gap-2 border border-gray-200 rounded-md p-2 bg-white"
@@ -113,6 +119,8 @@ export const ApprovedTeachersPanel = () => {
               </div>
             ))}
           </div>
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          </>
         )}
       </CardContent>
     </Card>
