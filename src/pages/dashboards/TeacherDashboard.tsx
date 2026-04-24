@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, ClipboardList, MessageSquare, Download } from "lucide-react";
+import { Send, ClipboardList, MessageSquare, Download, Paperclip, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
 import { PieChartCard, BarChartCard } from "@/components/dashboard/Charts";
 import { CommentThread } from "@/components/dashboard/CommentThread";
 import { Pagination, paginate, totalPagesOf } from "@/components/dashboard/Pagination";
+import { PhotoAttachments, AttachmentBadge } from "@/components/dashboard/PhotoLightbox";
 import { useComplaints } from "@/hooks/useStore";
 import {
   addComplaint,
@@ -65,7 +66,39 @@ export const TeacherDashboard = ({ session }: Props) => {
   const [subtopic, setSubtopic] = useState("");
   const [desc, setDesc] = useState("");
   const [urgency, setUrgency] = useState<Urgency>("low");
+  const [photos, setPhotos] = useState<File[]>([]);
   const descWords = wordCount(desc);
+
+  const MAX_PHOTOS = 4;
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+
+  const onPickFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+    const valid: File[] = [];
+    for (const f of picked) {
+      if (!ACCEPTED.includes(f.type)) {
+        toast.error(`${f.name}: only JPG, PNG or WEBP allowed.`);
+        continue;
+      }
+      if (f.size > MAX_BYTES) {
+        toast.error(`${f.name}: exceeds 5 MB limit.`);
+        continue;
+      }
+      valid.push(f);
+    }
+    setPhotos((prev) => {
+      const next = [...prev, ...valid].slice(0, MAX_PHOTOS);
+      if (prev.length + valid.length > MAX_PHOTOS) {
+        toast.error(`Maximum ${MAX_PHOTOS} photos per complaint.`);
+      }
+      return next;
+    });
+  };
+  const removePhoto = (i: number) =>
+    setPhotos((p) => p.filter((_, idx) => idx !== i));
 
   const submit = async () => {
     if (!category) return toast.error("Select a category.");
@@ -82,7 +115,7 @@ export const TeacherDashboard = ({ session }: Props) => {
       urgency,
       category,
       subtopic,
-    });
+    }, photos);
     if (!complaint) {
       toast.error("Submission failed");
       return;
@@ -91,6 +124,7 @@ export const TeacherDashboard = ({ session }: Props) => {
     setSubtopic("");
     setDesc("");
     setUrgency("low");
+    setPhotos([]);
     toast.success(`✅ Submitted — ${complaint.ticketId}`, {
       description: "Your PDF receipt is downloading...",
     });
