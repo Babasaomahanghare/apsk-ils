@@ -64,7 +64,7 @@ export async function generateSlaReportPdf(complaints: Complaint[], scopeLabel: 
     startY: 110,
     head: [[
       "Ticket ID", "Submitted by", "Role", "Department", "Category",
-      "Urgency", "Status", "SLA", "Resolution Time", "Handled By",
+      "Urgency", "Status", "SLA", "Resolution Time", "Handled By", "Photos",
     ]],
     body: complaints.map((c) => {
       const ref = c.resolvedAt ?? Date.now();
@@ -81,6 +81,7 @@ export async function generateSlaReportPdf(complaints: Complaint[], scopeLabel: 
         slaMet ? "MET" : "BREACHED",
         resTime,
         c.handledBy ?? "—",
+        c.attachments?.length ? `${c.attachments.length}` : "—",
       ];
     }),
     styles: { fontSize: 8, cellPadding: 4 },

@@ -8,7 +8,7 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
   const header = [
     "Ticket ID", "Name", "Role", "Class", "Admission Number", "Email / Phone",
     "Complaint", "Category", "Subtopic", "Urgency", "Status",
-    "Deadline", "Date Submitted",
+    "Deadline", "Date Submitted", "Photos",
   ];
 
   const rows = complaints.map((c) => {
@@ -33,6 +33,7 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
       c.status.toUpperCase(),
       new Date(c.deadline).toLocaleString(),
       new Date(c.createdAt).toLocaleString(),
+      c.attachments?.length ? `${c.attachments.length}` : "",
     ];
   });
 
@@ -56,7 +57,7 @@ export function exportComplaintsXlsx(complaints: Complaint[], users: AppUser[]) 
   ws["!cols"] = [
     { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 16 },
     { wch: 28 }, { wch: 50 }, { wch: 22 }, { wch: 22 }, { wch: 10 },
-    { wch: 12 }, { wch: 22 }, { wch: 22 },
+    { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 8 },
   ];
   // Make row 0 tall enough for the logo
   ws["!rows"] = [{ hpt: 64 }, { hpt: 18 }];
