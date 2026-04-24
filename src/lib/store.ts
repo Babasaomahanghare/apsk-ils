@@ -158,6 +158,7 @@ type ComplaintRow = {
   assigned_to: AssignedTo;
   handled_by: string | null; handled_role: string | null;
   resolved_at: string | null;
+  attachments: string[] | null;
 };
 type StudentRow = {
   id: string; name: string; student_class: string; section: string;
@@ -198,6 +199,7 @@ export const mapComplaint = (r: ComplaintRow): Complaint => ({
   handledBy: r.handled_by ?? undefined,
   handledRole: r.handled_role ?? undefined,
   resolvedAt: r.resolved_at ? new Date(r.resolved_at).getTime() : undefined,
+  attachments: r.attachments ?? [],
 });
 export const mapStudent = (r: StudentRow): StudentUser => ({
   id: r.id, role: "student", name: r.name, studentClass: r.student_class,
