@@ -26,8 +26,9 @@ export interface TeacherUser {
   id: string;
   role: "teacher";
   name: string;
-  phone: string;
-  email: string;
+  username: string;
+  phone?: string;
+  email?: string;
   createdAt: number;
 }
 export type AppUser = StudentUser | TeacherUser;
@@ -165,7 +166,8 @@ type StudentRow = {
   admission: string; phone: string; email: string; created_at: string;
 };
 type TeacherRow = {
-  id: string; name: string; phone: string; email: string; created_at: string;
+  id: string; name: string; username: string | null;
+  phone: string | null; email: string | null; created_at: string;
 };
 type FeedbackRow = {
   id: string; author_id: string; author_name: string; text: string;
@@ -207,7 +209,9 @@ export const mapStudent = (r: StudentRow): StudentUser => ({
   createdAt: new Date(r.created_at).getTime(),
 });
 export const mapTeacher = (r: TeacherRow): TeacherUser => ({
-  id: r.id, role: "teacher", name: r.name, phone: r.phone, email: r.email,
+  id: r.id, role: "teacher", name: r.name,
+  username: r.username ?? "",
+  phone: r.phone ?? undefined, email: r.email ?? undefined,
   createdAt: new Date(r.created_at).getTime(),
 });
 export const mapFeedback = (r: FeedbackRow): Feedback => ({
