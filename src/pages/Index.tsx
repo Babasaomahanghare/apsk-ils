@@ -21,7 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Disclaimer } from "@/components/Disclaimer";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { findComplaintByTicket, type Complaint } from "@/lib/store";
+import { StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
+import { PhotoAttachments } from "@/components/dashboard/PhotoLightbox";
+import { motion as m } from "framer-motion";
 
 type Role = "student" | "teacher" | "admin";
 import campusHero from "@/assets/campus-hero.jpg";
@@ -92,17 +96,21 @@ const galleryItems = [
 ];
 
 const Index = () => {
-  const navigate = useNavigate();
   const [trackId, setTrackId] = useState("");
+  const [trackResult, setTrackResult] = useState<Complaint | undefined>(undefined);
+  const [trackSubmitted, setTrackSubmitted] = useState<string>("");
+  const [trackLoading, setTrackLoading] = useState(false);
 
-  const handleTrack = (e: React.FormEvent) => {
+  const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = trackId.trim();
-    if (!id) {
-      navigate("/track");
-      return;
-    }
-    navigate(`/track?id=${encodeURIComponent(id)}`);
+    setTrackSubmitted(id);
+    setTrackResult(undefined);
+    if (!id) return;
+    setTrackLoading(true);
+    const r = await findComplaintByTicket(id);
+    setTrackResult(r);
+    setTrackLoading(false);
   };
 
   return (
