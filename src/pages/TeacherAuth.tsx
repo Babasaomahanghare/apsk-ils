@@ -1,103 +1,69 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GraduationCap, Sparkles, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
+import { GraduationCap, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { FormField } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
-import {
-  validateName,
-  validatePhone,
-  validateEmail,
-  validatePassword,
-  type FieldErrors,
-} from "@/lib/validation";
-import { loginTeacher, registerTeacher, isEmailApproved } from "@/lib/store";
+import { validatePassword, type FieldErrors } from "@/lib/validation";
+import { loginTeacher, registerTeacher, validateTeacherUsername, normalizeTeacherUsername } from "@/lib/store";
 
 const TeacherAuth = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"register" | "login">("register");
 
-  const [form, setForm] = useState({ name: "", phone: "", email: "", password: "" });
+  const [form, setForm] = useState({ username: "", password: "", confirm: "" });
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [validating, setValidating] = useState(false);
-  const [validated, setValidated] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginUser, setLoginUser] = useState("");
   const [loginPwd, setLoginPwd] = useState("");
 
   const update = (k: keyof typeof form, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
-    setValidated(false);
     setErrors((e) => ({ ...e, [k]: "" }));
   };
 
-  const runValidation = () => {
-    setValidating(true);
-    setValidated(false);
-    setTimeout(async () => {
-      const next: FieldErrors = {};
-      const nameErr = validateName(form.name);
-      if (nameErr) next.name = nameErr;
-      const phoneErr = validatePhone(form.phone);
-      if (phoneErr) next.phone = phoneErr;
-      const emailErr = validateEmail(form.email);
-      if (emailErr) next.email = emailErr;
-      const pwdErr = validatePassword(form.password);
-      if (pwdErr) next.password = pwdErr;
-
-      // Whitelist check — only approved teacher emails may register.
-      if (!next.email) {
-        const approved = await isEmailApproved(form.email);
-        if (!approved) {
-          next.email = "Email not authorized. Contact admin.";
-        }
-      }
-
-      setErrors(next);
-      setValidating(false);
-
-      if (Object.keys(next).length === 0) {
-        setValidated(true);
-        toast.success("Email verified. You can register.");
-      } else {
-        toast.error("Validation failed", {
-          description: next.email === "Email not authorized. Contact admin."
-            ? "Email not authorized. Contact admin."
-            : "Please fix the highlighted fields.",
-        });
-      }
-    }, 900);
-  };
-
-  const handleRegister = async () => {
-    const res = await registerTeacher({
-      name: form.name.trim().replace(/\s+/g, " "),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-      password: form.password,
-    });
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const next: FieldErrors = {};
+    const uErr = validateTeacherUsername(form.username);
+    if (uErr) next.username = uErr;
+    const pErr = validatePassword(form.password);
+    if (pErr) next.password = pErr;
+    if (form.password !== form.confirm) next.confirm = "Passwords do not match.";
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields.");
+      return;
+    }
+    setSubmitting(true);
+    const username = normalizeTeacherUsername(form.username);
+    const res = await registerTeacher({ username, password: form.password });
     if (!res.ok) {
+      setSubmitting(false);
       toast.error("Registration failed", { description: res.error });
       return;
     }
-    const login = await loginTeacher(form.email.trim(), form.password);
+    // Auto-login and redirect straight to the dashboard.
+    const login = await loginTeacher(username, form.password);
+    setSubmitting(false);
     if (login.ok) {
-      toast.success("Registration complete");
+      toast.success("Welcome!", { description: `Signed in as ${username}` });
       navigate("/dashboard/teacher");
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emailErr = validateEmail(loginEmail);
+    const uErr = validateTeacherUsername(loginUser);
     const pwdErr = validatePassword(loginPwd);
-    if (emailErr || pwdErr) {
-      toast.error(emailErr || pwdErr || "Invalid credentials");
+    if (uErr || pwdErr) {
+      toast.error(uErr || pwdErr || "Invalid credentials");
       return;
     }
-    const res = await loginTeacher(loginEmail.trim(), loginPwd);
+    const res = await loginTeacher(loginUser, loginPwd);
     if (!res.ok) {
       toast.error("Sign-in failed", { description: res.error });
       return;
@@ -128,42 +94,22 @@ const TeacherAuth = () => {
 
       <AnimatePresence mode="wait">
         {mode === "register" ? (
-          <motion.div
+          <motion.form
             key="register"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.25 }}
+            onSubmit={handleRegister}
             className="space-y-4"
           >
             <FormField
-              id="t-name"
-              label="Full Name"
-              value={form.name}
-              onChange={(v) => update("name", v)}
-              placeholder="Anjali Verma"
-              error={errors.name}
-              validated={validated}
-            />
-            <FormField
-              id="t-phone"
-              label="Phone Number"
-              type="tel"
-              value={form.phone}
-              onChange={(v) => update("phone", v)}
-              placeholder="9876543210"
-              error={errors.phone}
-              validated={validated}
-            />
-            <FormField
-              id="t-email"
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(v) => update("email", v)}
-              placeholder="teacher@apskhadki.edu.in"
-              error={errors.email}
-              validated={validated}
+              id="t-username"
+              label="Username"
+              value={form.username}
+              onChange={(v) => update("username", v)}
+              placeholder="apsk@firstname"
+              error={errors.username}
             />
             <FormField
               id="t-password"
@@ -173,48 +119,25 @@ const TeacherAuth = () => {
               onChange={(v) => update("password", v)}
               placeholder="At least 6 characters"
               error={errors.password}
-              validated={validated}
+            />
+            <FormField
+              id="t-confirm"
+              label="Confirm Password"
+              type="password"
+              value={form.confirm}
+              onChange={(v) => update("confirm", v)}
+              placeholder="Repeat password"
+              error={errors.confirm}
             />
 
-            <div className="pt-2 space-y-3">
-              <Button
-                type="button"
-                onClick={runValidation}
-                disabled={validating}
-                className="w-full h-11 bg-gradient-to-r from-purple-500 to-indigo-600 hover:opacity-95 text-white font-semibold"
-              >
-                {validating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Validating with AI...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" /> Validate Details using AI
-                  </>
-                )}
-              </Button>
-
-              {validated && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md p-3"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  All details verified successfully
-                </motion.div>
-              )}
-
-              <Button
-                type="button"
-                onClick={handleRegister}
-                disabled={!validated}
-                className="w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:opacity-95 text-white font-semibold disabled:opacity-50"
-              >
-                Complete Registration <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </motion.div>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-700 hover:opacity-95 text-white font-semibold disabled:opacity-50"
+            >
+              {submitting ? "Creating account..." : (<>Complete Registration <ArrowRight className="w-4 h-4 ml-2" /></>)}
+            </Button>
+          </motion.form>
         ) : (
           <motion.form
             key="login"
@@ -226,12 +149,11 @@ const TeacherAuth = () => {
             className="space-y-4"
           >
             <FormField
-              id="t-login-email"
-              label="Email"
-              type="email"
-              value={loginEmail}
-              onChange={setLoginEmail}
-              placeholder="teacher@apskhadki.edu.in"
+              id="t-login-username"
+              label="Username"
+              value={loginUser}
+              onChange={setLoginUser}
+              placeholder="apsk@firstname"
             />
             <FormField
               id="t-login-pwd"
