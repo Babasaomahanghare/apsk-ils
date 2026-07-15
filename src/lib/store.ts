@@ -26,8 +26,9 @@ export interface TeacherUser {
   id: string;
   role: "teacher";
   name: string;
-  phone: string;
-  email: string;
+  username: string;
+  phone?: string;
+  email?: string;
   createdAt: number;
 }
 export type AppUser = StudentUser | TeacherUser;
@@ -165,7 +166,8 @@ type StudentRow = {
   admission: string; phone: string; email: string; created_at: string;
 };
 type TeacherRow = {
-  id: string; name: string; phone: string; email: string; created_at: string;
+  id: string; name: string; username: string | null;
+  phone: string | null; email: string | null; created_at: string;
 };
 type FeedbackRow = {
   id: string; author_id: string; author_name: string; text: string;
@@ -207,7 +209,9 @@ export const mapStudent = (r: StudentRow): StudentUser => ({
   createdAt: new Date(r.created_at).getTime(),
 });
 export const mapTeacher = (r: TeacherRow): TeacherUser => ({
-  id: r.id, role: "teacher", name: r.name, phone: r.phone, email: r.email,
+  id: r.id, role: "teacher", name: r.name,
+  username: r.username ?? "",
+  phone: r.phone ?? undefined, email: r.email ?? undefined,
   createdAt: new Date(r.created_at).getTime(),
 });
 export const mapFeedback = (r: FeedbackRow): Feedback => ({
@@ -311,29 +315,46 @@ export const registerStudent = async (
   return { ok: true, user: mapStudent(inserted as StudentRow) };
 };
 
-export const registerTeacher = async (
-  data: Omit<TeacherUser, "id" | "role" | "createdAt"> & { password: string },
-): Promise<{ ok: boolean; error?: string; user?: TeacherUser }> => {
-  // Whitelist enforcement (also re-checked here even if frontend bypassed).
-  const emailNorm = data.email.trim().toLowerCase();
-  const { data: approved } = await supabase.from("approved_teachers")
-    .select("id").eq("email", emailNorm).maybeSingle();
-  if (!approved) {
-    return { ok: false, error: "Unauthorized email. Contact admin to be added to the approved list." };
-  }
+export const normalizeTeacherUsername = (raw: string): string =>
+  raw.trim().replace(/\s+/g, "").toLowerCase();
 
-  const { data: dupEmail } = await supabase.from("teachers").select("id")
-    .ilike("email", data.email).maybeSingle();
-  if (dupEmail) return { ok: false, error: "Email already registered." };
+/** Teacher usernames must be `apsk@firstname` (letters only after @). */
+export const validateTeacherUsername = (raw: string): string | null => {
+  const u = normalizeTeacherUsername(raw);
+  if (!u) return "Username is required.";
+  if (!/^apsk@[a-z]{2,}$/.test(u)) return "Username must be like apsk@firstname (letters only).";
+  return null;
+};
+
+export const registerTeacher = async (
+  data: { username: string; password: string },
+): Promise<{ ok: boolean; error?: string; user?: TeacherUser }> => {
+  const username = normalizeTeacherUsername(data.username);
+  const usernameErr = validateTeacherUsername(username);
+  if (usernameErr) return { ok: false, error: usernameErr };
+
+  const { data: dup } = await supabase.from("teachers").select("id")
+    .ilike("username", username).maybeSingle();
+  if (dup) return { ok: false, error: "Username already taken." };
 
   const { data: hashData, error: hashErr } = await supabase.rpc("hash_password", { _password: data.password });
   if (hashErr || !hashData) return { ok: false, error: hashErr?.message ?? "Password hash failed" };
 
+  // Derive a display name from the part after `apsk@`.
+  const first = username.split("@")[1] ?? username;
+  const displayName = first.charAt(0).toUpperCase() + first.slice(1);
+
   const { data: inserted, error } = await supabase.from("teachers").insert({
-    name: data.name, phone: data.phone, email: data.email,
+    name: displayName,
+    username,
     password_hash: hashData as unknown as string,
-  }).select("*").single();
-  if (error || !inserted) return { ok: false, error: error?.message ?? "Registration failed" };
+  } as never).select("*").single();
+  if (error || !inserted) {
+    if (error && /duplicate|unique/i.test(error.message)) {
+      return { ok: false, error: "Username already taken." };
+    }
+    return { ok: false, error: error?.message ?? "Registration failed" };
+  }
   return { ok: true, user: mapTeacher(inserted as TeacherRow) };
 };
 
@@ -410,14 +431,15 @@ export const loginStudent = async (admission: string, password: string) => {
   return { ok: true as const, user };
 };
 
-export const loginTeacher = async (email: string, password: string) => {
+export const loginTeacher = async (username: string, password: string) => {
+  const u = normalizeTeacherUsername(username);
   const { data } = await supabase.from("teachers").select("*")
-    .ilike("email", email).maybeSingle();
-  if (!data) return { ok: false as const, error: "Invalid email or password." };
+    .ilike("username", u).maybeSingle();
+  if (!data) return { ok: false as const, error: "Invalid username or password." };
   const { data: ok } = await supabase.rpc("verify_password", {
     _password: password, _hash: (data as { password_hash: string }).password_hash,
   });
-  if (!ok) return { ok: false as const, error: "Invalid email or password." };
+  if (!ok) return { ok: false as const, error: "Invalid username or password." };
   const user = mapTeacher(data as TeacherRow);
   setSession({ userId: user.id, role: "teacher", name: user.name });
   return { ok: true as const, user };

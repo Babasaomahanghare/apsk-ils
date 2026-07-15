@@ -465,7 +465,7 @@ export const AdminDashboard = ({ session }: Props) => {
                         </Button>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600 mt-0.5 truncate">{t.email}</p>
+                    <p className="text-xs text-gray-600 mt-0.5 truncate font-mono">{t.username || "—"}</p>
                   </div>
                 ))}
               </div>

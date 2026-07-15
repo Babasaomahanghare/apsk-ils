@@ -289,27 +289,30 @@ export type Database = {
       teachers: {
         Row: {
           created_at: string
-          email: string
+          email: string | null
           id: string
           name: string
           password_hash: string
-          phone: string
+          phone: string | null
+          username: string | null
         }
         Insert: {
           created_at?: string
-          email: string
+          email?: string | null
           id?: string
           name: string
           password_hash: string
-          phone: string
+          phone?: string | null
+          username?: string | null
         }
         Update: {
           created_at?: string
-          email?: string
+          email?: string | null
           id?: string
           name?: string
           password_hash?: string
-          phone?: string
+          phone?: string | null
+          username?: string | null
         }
         Relationships: []
       }

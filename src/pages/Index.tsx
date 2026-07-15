@@ -21,7 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Disclaimer } from "@/components/Disclaimer";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { findComplaintByTicket, type Complaint } from "@/lib/store";
+import { StatusBadge, UrgencyBadge } from "@/components/dashboard/DashboardShell";
+import { SlaBadge, TicketIdChip } from "@/components/dashboard/SlaBadge";
+import { PhotoAttachments } from "@/components/dashboard/PhotoLightbox";
+import { motion as m } from "framer-motion";
 
 type Role = "student" | "teacher" | "admin";
 import campusHero from "@/assets/campus-hero.jpg";
@@ -92,17 +96,21 @@ const galleryItems = [
 ];
 
 const Index = () => {
-  const navigate = useNavigate();
   const [trackId, setTrackId] = useState("");
+  const [trackResult, setTrackResult] = useState<Complaint | undefined>(undefined);
+  const [trackSubmitted, setTrackSubmitted] = useState<string>("");
+  const [trackLoading, setTrackLoading] = useState(false);
 
-  const handleTrack = (e: React.FormEvent) => {
+  const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = trackId.trim();
-    if (!id) {
-      navigate("/track");
-      return;
-    }
-    navigate(`/track?id=${encodeURIComponent(id)}`);
+    setTrackSubmitted(id);
+    setTrackResult(undefined);
+    if (!id) return;
+    setTrackLoading(true);
+    const r = await findComplaintByTicket(id);
+    setTrackResult(r);
+    setTrackLoading(false);
   };
 
   return (
@@ -133,12 +141,12 @@ const Index = () => {
               <p className="text-neutral-300">Log. Track. Resolve.</p>
             </div>
             <div className="hidden sm:flex items-center gap-3 shrink-0">
-              <Link
-                to="/track"
+              <a
+                href="#track"
                 className="text-xs sm:text-sm font-semibold text-white bg-white/15 hover:bg-white/25 border border-white/25 backdrop-blur px-3 py-1.5 rounded-full transition"
               >
                 🎟️ Track Complaint
-              </Link>
+              </a>
             </div>
             <div className="lg:hidden text-skyblue text-xs font-semibold whitespace-nowrap sm:hidden">ILS</div>
           </div>
@@ -233,7 +241,7 @@ const Index = () => {
           </section>
 
           {/* Track Complaint */}
-          <section className="container mx-auto px-4 pb-4 sm:pb-8">
+          <section id="track" className="container mx-auto px-4 pb-4 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -274,6 +282,96 @@ const Index = () => {
                   <p className="mt-3 text-xs text-gray-500 text-center sm:text-left">
                     💡 Tip: Your Ticket ID was shown after submission and emailed in your confirmation PDF.
                   </p>
+
+                  {trackSubmitted && !trackLoading && !trackResult && (
+                    <p className="mt-5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+                      Ticket Not Found — no complaint matches{" "}
+                      <span className="font-mono">{trackSubmitted}</span>. Please check the Ticket ID and try again.
+                    </p>
+                  )}
+
+                  {trackLoading && (
+                    <p className="mt-5 text-sm text-gray-600">Looking up ticket…</p>
+                  )}
+
+                  {trackResult && (
+                    <m.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-6 space-y-4 border-t pt-5"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TicketIdChip ticketId={trackResult.ticketId} />
+                        <UrgencyBadge urgency={trackResult.urgency} />
+                        <StatusBadge status={trackResult.status} />
+                        <SlaBadge complaint={trackResult} />
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500 text-xs uppercase font-bold">Submitted by</p>
+                          <p className="text-navy font-semibold">
+                            {trackResult.authorName} ({trackResult.authorRole})
+                          </p>
+                        </div>
+                        {trackResult.category && (
+                          <div>
+                            <p className="text-gray-500 text-xs uppercase font-bold">Category / Priority</p>
+                            <p className="text-navy">
+                              {trackResult.category}
+                              {trackResult.subtopic ? ` → ${trackResult.subtopic}` : ""} ·{" "}
+                              <span className="capitalize">{trackResult.urgency}</span>
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-gray-500 text-xs uppercase font-bold">Assigned Worker</p>
+                          <p className="text-navy">
+                            {trackResult.handledBy
+                              ? `${trackResult.handledBy}${trackResult.handledRole ? ` (${trackResult.handledRole})` : ""}`
+                              : trackResult.assignedTo && trackResult.assignedTo !== "UNASSIGNED"
+                              ? trackResult.assignedTo.replace("_", " ")
+                              : "Not assigned yet"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs uppercase font-bold">Submitted</p>
+                          <p className="text-navy">{new Date(trackResult.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs uppercase font-bold">Last Updated</p>
+                          <p className="text-navy">{new Date(trackResult.updatedAt).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs uppercase font-bold">SLA Deadline</p>
+                          <p className="text-navy">{new Date(trackResult.deadline).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-sm">
+                        <p className="text-gray-500 text-xs uppercase font-bold">Description</p>
+                        <p className="text-gray-700 whitespace-pre-wrap">{trackResult.description}</p>
+                      </div>
+
+                      {trackResult.attachments && trackResult.attachments.length > 0 && (
+                        <div className="text-sm">
+                          <p className="text-gray-500 text-xs uppercase font-bold mb-1">
+                            Attachments ({trackResult.attachments.length})
+                          </p>
+                          <PhotoAttachments urls={trackResult.attachments} ticketId={trackResult.ticketId} />
+                        </div>
+                      )}
+
+                      {trackResult.response && (
+                        <div className="text-sm bg-blue-50 border border-blue-200 rounded-md p-3">
+                          <p className="text-blue-900 font-semibold text-xs uppercase mb-1">
+                            {trackResult.status === "resolved" ? "Resolution Remarks" : "Admin Remarks"}
+                          </p>
+                          <p className="text-blue-900 whitespace-pre-wrap">{trackResult.response}</p>
+                        </div>
+                      )}
+                    </m.div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
